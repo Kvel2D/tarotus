@@ -1,0 +1,28 @@
+make enemies attack
+implement a* for enemies
+make enemy/nothing/item cards
+
+
+
+there should be upper and lower limit for number of covered cards
+something like: min of 30%, max of 70%
+min is more important than max
+so as player uncovers cards, each card has a timer
+when player uncovers too many cards, cards are replaced earlier
+when player uncovers cards too slowly, cards are gradually replaced
+
+
+USING ITEMS
+click? - confused with drag
+press number button - what if too many slots?
+drag onto player - might make a mistake
+right click - confusing
+universal button for potions - there are other items
+what about items that don't affect the player directly(bomb) - drag onto player doesn't make sense then
+
+
+IDEAS:
+maybe 4x4 is too small, 5x4 might be better
+add attack controls for mouse too
+enemies that just block the way and don't attack(but do move)
+inventory is for everyting, so armor goes there too and you can drop armor if you want that one item but don't have enough space
