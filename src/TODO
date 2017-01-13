@@ -1,7 +1,13 @@
-make enemies attack
-implement a* for enemies
-make enemy/nothing/item cards
+add card flip state and remove that weird card flip stopper for movement
+card system
+enemy hp indicator
+mock up specific cards
 
+
+CARD TYPES:
+nothing card spawns some walls
+dude card spawns some dudes then walls
+treasure card spawns treasure then walls
 
 
 there should be upper and lower limit for number of covered cards
@@ -22,6 +28,7 @@ what about items that don't affect the player directly(bomb) - drag onto player 
 
 
 IDEAS:
+20 arcana bosses might be too much, maybe make arcanas into spells/abilities and make kings/queens bosses
 maybe 4x4 is too small, 5x4 might be better
 add attack controls for mouse too
 enemies that just block the way and don't attack(but do move)

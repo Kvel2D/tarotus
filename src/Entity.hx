@@ -11,6 +11,7 @@ enum DoorColor {
 
 @:publicFields
 class Entity {
+	static var all = new Array<Dynamic>();
 	static var entities = new ObjectMap<Dynamic, Array<Dynamic>>();
 
 	static function get(type: Dynamic): Array<Dynamic> {
@@ -29,6 +30,7 @@ class Entity {
 			entities.set(type, new Array<Dynamic>());
 		}
 		entities.get(type).push(this);
+		all.push(this);
 
 		id = id_max;
 		id_max++;
@@ -39,11 +41,12 @@ class Entity {
 			for (entity in type) {
 				if (entity == this)
 				{
-					type.remove(entity);
+					type.remove(this);
 					break;
 				}
 			}
 		}
+		all.remove(this);
 	}
 }
 
@@ -72,6 +75,7 @@ class Dude extends Entity {
 	var moved = false;
 	var dx = 0;
 	var dy = 0;
+	var dead = false;
 }
 
 enum ItemType {
