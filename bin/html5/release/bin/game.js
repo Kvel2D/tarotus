@@ -47,6 +47,8 @@ ApplicationMain.create = function() {
 	types.push("FONT");
 	urls.push("data/fonts/Seraphimb1/Seraphimb1.woff");
 	types.push("BINARY");
+	urls.push("data/graphics/dog.png");
+	types.push("IMAGE");
 	urls.push("data/graphics/tiles.png");
 	types.push("IMAGE");
 	if(ApplicationMain.config.assetsPrefix != null) {
@@ -71,7 +73,7 @@ ApplicationMain.init = function() {
 	}
 };
 ApplicationMain.main = function() {
-	ApplicationMain.config = { build : "252", company : "", file : "game", fps : 60, name : "Tarotus", orientation : "landscape", packageName : "com.kvel2d", version : "1.0.0", windows : [{ antialiasing : 0, background : 0, borderless : false, depthBuffer : false, display : 0, fullscreen : false, hardware : true, height : 1000, hidden : null, maximized : null, minimized : null, parameters : "{}", resizable : true, stencilBuffer : true, title : "Tarotus", vsync : true, width : 1500, x : null, y : null}]};
+	ApplicationMain.config = { build : "319", company : "", file : "game", fps : 60, name : "Tarotus", orientation : "landscape", packageName : "com.kvel2d", version : "1.0.0", windows : [{ antialiasing : 0, background : 0, borderless : false, depthBuffer : false, display : 0, fullscreen : false, hardware : true, height : 1000, hidden : null, maximized : null, minimized : null, parameters : "{}", resizable : true, stencilBuffer : true, title : "Tarotus", vsync : true, width : 1500, x : null, y : null}]};
 };
 ApplicationMain.start = function() {
 	var hasMain = false;
@@ -2173,17 +2175,30 @@ var DefaultAssetLibrary = function() {
 		_this23.h["data/fonts/Seraphimb1/Seraphimb1.woff"] = value14;
 	}
 	var _this24 = this.path;
-	if(__map_reserved["data/graphics/tiles.png"] != null) {
-		_this24.setReserved("data/graphics/tiles.png","data/graphics/tiles.png");
+	if(__map_reserved["data/graphics/dog.png"] != null) {
+		_this24.setReserved("data/graphics/dog.png","data/graphics/dog.png");
 	} else {
-		_this24.h["data/graphics/tiles.png"] = "data/graphics/tiles.png";
+		_this24.h["data/graphics/dog.png"] = "data/graphics/dog.png";
 	}
 	var _this25 = this.type;
 	var value15 = "IMAGE";
-	if(__map_reserved["data/graphics/tiles.png"] != null) {
-		_this25.setReserved("data/graphics/tiles.png",value15);
+	if(__map_reserved["data/graphics/dog.png"] != null) {
+		_this25.setReserved("data/graphics/dog.png",value15);
 	} else {
-		_this25.h["data/graphics/tiles.png"] = value15;
+		_this25.h["data/graphics/dog.png"] = value15;
+	}
+	var _this26 = this.path;
+	if(__map_reserved["data/graphics/tiles.png"] != null) {
+		_this26.setReserved("data/graphics/tiles.png","data/graphics/tiles.png");
+	} else {
+		_this26.h["data/graphics/tiles.png"] = "data/graphics/tiles.png";
+	}
+	var _this27 = this.type;
+	var value16 = "IMAGE";
+	if(__map_reserved["data/graphics/tiles.png"] != null) {
+		_this27.setReserved("data/graphics/tiles.png",value16);
+	} else {
+		_this27.h["data/graphics/tiles.png"] = value16;
 	}
 	var assetsPrefix = null;
 	if(ApplicationMain.config != null && Object.prototype.hasOwnProperty.call(ApplicationMain.config,"assetsPrefix")) {
@@ -2193,13 +2208,13 @@ var DefaultAssetLibrary = function() {
 		var tmp = this.path.keys();
 		while(tmp.hasNext()) {
 			var k = tmp.next();
-			var _this26 = this.path;
-			var value16 = assetsPrefix + (__map_reserved[k] != null?_this26.getReserved(k):_this26.h[k]);
-			var _this27 = this.path;
+			var _this28 = this.path;
+			var value17 = assetsPrefix + (__map_reserved[k] != null?_this28.getReserved(k):_this28.h[k]);
+			var _this29 = this.path;
 			if(__map_reserved[k] != null) {
-				_this27.setReserved(k,value16);
+				_this29.setReserved(k,value17);
 			} else {
-				_this27.h[k] = value16;
+				_this29.h[k] = value17;
 			}
 		}
 	}
@@ -2765,7 +2780,7 @@ Item.__super__ = Entity;
 Item.prototype = $extend(Entity.prototype,{
 	__class__: Item
 });
-var GameState = $hxClasses["GameState"] = { __ename__ : true, __constructs__ : ["GameState_PlayerTurn","GameState_PlayerVisual","GameState_EnemyVisual","GameState_TurnResult","GameState_ItemDrag"] };
+var GameState = $hxClasses["GameState"] = { __ename__ : true, __constructs__ : ["GameState_PlayerTurn","GameState_PlayerVisual","GameState_EnemyVisual","GameState_TurnResult","GameState_ItemDrag","GameState_CardFlip"] };
 GameState.GameState_PlayerTurn = ["GameState_PlayerTurn",0];
 GameState.GameState_PlayerTurn.toString = $estr;
 GameState.GameState_PlayerTurn.__enum__ = GameState;
@@ -2781,7 +2796,10 @@ GameState.GameState_TurnResult.__enum__ = GameState;
 GameState.GameState_ItemDrag = ["GameState_ItemDrag",4];
 GameState.GameState_ItemDrag.toString = $estr;
 GameState.GameState_ItemDrag.__enum__ = GameState;
-GameState.__empty_constructs__ = [GameState.GameState_PlayerTurn,GameState.GameState_PlayerVisual,GameState.GameState_EnemyVisual,GameState.GameState_TurnResult,GameState.GameState_ItemDrag];
+GameState.GameState_CardFlip = ["GameState_CardFlip",5];
+GameState.GameState_CardFlip.toString = $estr;
+GameState.GameState_CardFlip.__enum__ = GameState;
+GameState.__empty_constructs__ = [GameState.GameState_PlayerTurn,GameState.GameState_PlayerVisual,GameState.GameState_EnemyVisual,GameState.GameState_TurnResult,GameState.GameState_ItemDrag,GameState.GameState_CardFlip];
 var CardType = $hxClasses["CardType"] = { __ename__ : true, __constructs__ : ["CardType_None","CardType_Dude","CardType_Treasure","CardType_Nothing"] };
 CardType.CardType_None = ["CardType_None",0];
 CardType.CardType_None.toString = $estr;
@@ -2812,12 +2830,15 @@ var Game = function() {
 	this.inventory = new Array(5);
 	this.cards = new Array(4);
 	this.walls = haxegon_Data.bool_2dvector(12,15);
-	this.flipped_card_last_turn_timer = 0;
 	this.dragged_item = null;
 	this.drag_dy = 0;
 	this.drag_dx = 0;
+	this.flipped_card = { x : 0, y : 0};
 	this.state_timer = 0;
 	this.state = GameState.GameState_PlayerTurn;
+	haxegon_Gfx.create_image("card_front",192,320);
+	haxegon_Gfx.create_image("card_back",192,320);
+	haxegon_Gfx.create_image("map_canvas",768,960);
 	var _g = 0;
 	while(_g < 5) this.inventory[_g++] = null;
 	var _g1 = 0;
@@ -3078,7 +3099,7 @@ Game.prototype = {
 						card_color = haxegon_Col.BLUE;
 						break;
 					}
-					haxegon_Gfx.fill_box(x2 * 3 * 64,y2 * 5 * 64,192,320,card_color,0.4);
+					haxegon_Gfx.fill_box(x2 * 3 * 64,y2 * 5 * 64,192,320,card_color,0.8);
 				}
 			}
 		}
@@ -3202,38 +3223,48 @@ Game.prototype = {
 		if(haxegon_Input.pressed(haxegon_Key.DOWN)) {
 			this.player.dy++;
 		}
-		if(this.flipped_card_last_turn_timer != 0) {
-			this.player.dx = 0;
-			this.player.dy = 0;
-			this.flipped_card_last_turn_timer--;
-		}
 		if(this.player.dy != 0 && this.player.dx != 0) {
 			this.player.dx = 0;
 			this.player.dy = 0;
 		}
 		var move_x = this.player.x + this.player.dx;
 		var move_y = this.player.y + this.player.dy;
-		var move_card = card_at_position(move_x,move_y);
-		var player_flipped_card = false;
-		if(this.cards[move_card.x][move_card.y].covered) {
-			this.cards[move_card.x][move_card.y].covered = false;
-			player_flipped_card = true;
-			this.flipped_card_last_turn_timer = 5;
-			var _g5 = 0;
-			var _g13 = Entity.get(Dude);
-			while(_g5 < _g13.length) {
-				var dude2 = _g13[_g5];
-				++_g5;
-				var dude_card1 = card_at_position(dude2.x,dude2.y);
-				if(dude_card1.x == move_card.x && dude_card1.y == move_card.y) {
-					dude2.active = true;
+		if(!this.out_of_bounds(move_x,move_y)) {
+			var move_card = card_at_position(move_x,move_y);
+			if(this.cards[move_card.x][move_card.y].covered) {
+				this.state = GameState.GameState_CardFlip;
+				this.flipped_card.x = move_card.x;
+				this.flipped_card.y = move_card.y;
+				haxegon_Gfx.draw_to_image("map_canvas");
+				haxegon_Gfx.clear_screen(haxegon_Col.BLACK);
+				this.render();
+				haxegon_Gfx.draw_to_image("card_back");
+				haxegon_Gfx.clear_screen(haxegon_Col.BLACK);
+				haxegon_Gfx.draw_image(-move_card.x * 3 * 64,-move_card.y * 5 * 64,"map_canvas");
+				this.cards[move_card.x][move_card.y].covered = false;
+				haxegon_Gfx.draw_to_image("map_canvas");
+				haxegon_Gfx.clear_screen(haxegon_Col.BLACK);
+				this.render();
+				haxegon_Gfx.draw_to_image("card_front");
+				haxegon_Gfx.clear_screen(haxegon_Col.BLACK);
+				haxegon_Gfx.draw_image(-move_card.x * 3 * 64,-move_card.y * 5 * 64,"map_canvas");
+				haxegon_Gfx.draw_to_screen();
+				var _g5 = 0;
+				var _g13 = Entity.get(Dude);
+				while(_g5 < _g13.length) {
+					var dude2 = _g13[_g5];
+					++_g5;
+					var dude_card1 = card_at_position(dude2.x,dude2.y);
+					if(dude_card1.x == move_card.x && dude_card1.y == move_card.y) {
+						dude2.active = true;
+					}
 				}
 			}
-		}
-		if((this.player.dx != 0 || this.player.dy != 0) && !player_flipped_card && this.space_is_free(move_x,move_y,this.player)) {
-			this.state = GameState.GameState_PlayerVisual;
-			this.player.moved = true;
-			this.player.attacked = false;
+			if((this.player.dx != 0 || this.player.dy != 0) && this.state != GameState.GameState_CardFlip && this.space_is_free(move_x,move_y,this.player)) {
+				this.state = GameState.GameState_PlayerVisual;
+				this.player.moved = true;
+				this.player.attacked = false;
+			}
 		}
 		if(!this.player.moved) {
 			this.player.dx = 0;
@@ -3492,6 +3523,25 @@ Game.prototype = {
 		this.render();
 		this.state = GameState.GameState_PlayerTurn;
 	}
+	,update_card_flip: function() {
+		this.render();
+		haxegon_Gfx.fill_box(this.flipped_card.x * 3 * 64,this.flipped_card.y * 5 * 64,192,320,haxegon_Col.BLACK);
+		if(this.state_timer / 20 < 0.5) {
+			haxegon_Gfx.scale(1 - 2 * this.state_timer / 20,1);
+			haxegon_Gfx.draw_image(this.flipped_card.x * 3 * 64,this.flipped_card.y * 5 * 64,"card_back");
+			haxegon_Gfx.scale(1,1);
+		} else {
+			haxegon_Gfx.scale(2 * (this.state_timer / 20 - 0.5),1);
+			haxegon_Gfx.draw_image(this.flipped_card.x * 3 * 64,this.flipped_card.y * 5 * 64,"card_front");
+			haxegon_Gfx.scale(1,1);
+		}
+		haxegon_Text.display(0,0,"" + this.state_timer,haxegon_Col.YELLOW);
+		this.state_timer++;
+		if(this.state_timer > 20) {
+			this.state = GameState.GameState_PlayerTurn;
+			this.state_timer = 0;
+		}
+	}
 	,update: function() {
 		switch(this.state[1]) {
 		case 0:
@@ -3508,6 +3558,9 @@ Game.prototype = {
 			break;
 		case 4:
 			this.update_item_drag();
+			break;
+		case 5:
+			this.update_card_flip();
 			break;
 		}
 	}
@@ -6508,7 +6561,7 @@ haxegon_Gfx.grabimagefromimage = function(imagename,imagetocopyfrom,x,y,w,h) {
 	haxegon_Gfx.imagenum = __map_reserved[imagename] != null?_this1.getReserved(imagename):_this1.h[imagename];
 	var _this2 = haxegon_Gfx.imageindex;
 	if(!(__map_reserved[imagetocopyfrom] != null?_this2.existsReserved(imagetocopyfrom):_this2.h.hasOwnProperty(imagetocopyfrom))) {
-		haxe_Log.trace("ERROR: No image called \"" + imagetocopyfrom + "\" found.",{ fileName : "Gfx.hx", lineNumber : 529, className : "haxegon.Gfx", methodName : "grabimagefromimage"});
+		haxe_Log.trace("ERROR: No image called \"" + imagetocopyfrom + "\" found.",{ fileName : "Gfx.hx", lineNumber : 526, className : "haxegon.Gfx", methodName : "grabimagefromimage"});
 	}
 	var _this3 = haxegon_Gfx.imageindex;
 	var imagenumfrom = __map_reserved[imagetocopyfrom] != null?_this3.getReserved(imagetocopyfrom):_this3.h[imagetocopyfrom];
@@ -6543,11 +6596,11 @@ haxegon_Gfx.copytile = function(totilenumber,fromtileset,fromtilenumber) {
 			var _this5 = haxegon_Gfx.tilesetindex;
 			var tmp6 = tmp5 + Std.string(haxegon_Gfx.tiles[__map_reserved[fromtileset] != null?_this5.getReserved(fromtileset):_this5.h[fromtileset]].width) + "x";
 			var _this6 = haxegon_Gfx.tilesetindex;
-			haxe_Log.trace(tmp6 + Std.string(haxegon_Gfx.tiles[__map_reserved[fromtileset] != null?_this6.getReserved(fromtileset):_this6.h[fromtileset]].height) + ") are different sizes. Maybe try just drawing to the tile you want instead with Gfx.drawtotile()?",{ fileName : "Gfx.hx", lineNumber : 546, className : "haxegon.Gfx", methodName : "copytile"});
+			haxe_Log.trace(tmp6 + Std.string(haxegon_Gfx.tiles[__map_reserved[fromtileset] != null?_this6.getReserved(fromtileset):_this6.h[fromtileset]].height) + ") are different sizes. Maybe try just drawing to the tile you want instead with Gfx.drawtotile()?",{ fileName : "Gfx.hx", lineNumber : 543, className : "haxegon.Gfx", methodName : "copytile"});
 			return;
 		}
 	} else {
-		haxe_Log.trace("ERROR: Tileset " + fromtileset + " hasn't been loaded or created.",{ fileName : "Gfx.hx", lineNumber : 550, className : "haxegon.Gfx", methodName : "copytile"});
+		haxe_Log.trace("ERROR: Tileset " + fromtileset + " hasn't been loaded or created.",{ fileName : "Gfx.hx", lineNumber : 547, className : "haxegon.Gfx", methodName : "copytile"});
 		return;
 	}
 };
@@ -12445,7 +12498,7 @@ var lime_AssetCache = function() {
 	this.audio = new haxe_ds_StringMap();
 	this.font = new haxe_ds_StringMap();
 	this.image = new haxe_ds_StringMap();
-	this.version = 782687;
+	this.version = 547991;
 };
 $hxClasses["lime.AssetCache"] = lime_AssetCache;
 lime_AssetCache.__name__ = ["lime","AssetCache"];
@@ -44258,6 +44311,7 @@ Game.inventory_x = 800;
 Game.inventory_y = 64;
 Game.inventory_slot_size = 64;
 Game.visual_timer_max = 5;
+Game.card_flip_timer_max = 20;
 Main.screen_width = 1100;
 Main.screen_height = 1000;
 Main.state = MainState.MainState_Game;

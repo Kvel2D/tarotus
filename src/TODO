@@ -1,8 +1,14 @@
-add card flip state and remove that weird card flip stopper for movement
-card system
+fix movement bugs(dude walks on covered card)
+player can move onto dude sometimes?
+dude can move onto player sometimes?
 enemy hp indicator
 mock up specific cards
+implement other weapons:
+fists(for when you don't have anything else)
+spear(hits two squares, takes an extra turn?)
+bow(hits in a line, takes an extra turn or requires arrows which are limited
 
+be on the lookout for more movement bugs
 
 CARD TYPES:
 nothing card spawns some walls
@@ -17,6 +23,13 @@ so as player uncovers cards, each card has a timer
 when player uncovers too many cards, cards are replaced earlier
 when player uncovers cards too slowly, cards are gradually replaced
 
+remove only cards that are completed and empty, prioritizing older cards, where age is tracked from the moment card is flipped
+completed means:
+treasure cards: opened chest(not picking up item is okay)
+enemy: if enemy is moving, then doesn't matter, if enemy is static, then when all enemies belonging to card are dead
+empty means:
+no enemies or player, item is ok
+
 
 USING ITEMS
 click? - confused with drag
@@ -29,7 +42,5 @@ what about items that don't affect the player directly(bomb) - drag onto player 
 
 IDEAS:
 20 arcana bosses might be too much, maybe make arcanas into spells/abilities and make kings/queens bosses
-maybe 4x4 is too small, 5x4 might be better
-add attack controls for mouse too
-enemies that just block the way and don't attack(but do move)
-inventory is for everyting, so armor goes there too and you can drop armor if you want that one item but don't have enough space
+add attack controls for mouse too(going full WASD + mouse might be better)
+dudes that just block the way and don't attack(but do move)

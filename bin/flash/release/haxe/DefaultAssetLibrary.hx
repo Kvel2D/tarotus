@@ -72,6 +72,7 @@ class DefaultAssetLibrary extends AssetLibrary {
 		
 		
 		
+		
 		#end
 		
 		#if flash
@@ -100,6 +101,8 @@ class DefaultAssetLibrary extends AssetLibrary {
 		type.set ("data/fonts/Seraphimb1/Seraphimb1.ttf", AssetType.FONT);
 		className.set ("data/fonts/Seraphimb1/Seraphimb1.woff", __ASSET__data_fonts_seraphimb1_seraphimb1_woff);
 		type.set ("data/fonts/Seraphimb1/Seraphimb1.woff", AssetType.BINARY);
+		className.set ("data/graphics/dog.png", __ASSET__data_graphics_dog_png);
+		type.set ("data/graphics/dog.png", AssetType.IMAGE);
 		className.set ("data/graphics/tiles.png", __ASSET__data_graphics_tiles_png);
 		type.set ("data/graphics/tiles.png", AssetType.IMAGE);
 		
@@ -155,6 +158,10 @@ class DefaultAssetLibrary extends AssetLibrary {
 		path.set (id, id);
 		
 		type.set (id, AssetType.BINARY);
+		id = "data/graphics/dog.png";
+		path.set (id, id);
+		
+		type.set (id, AssetType.IMAGE);
 		id = "data/graphics/tiles.png";
 		path.set (id, id);
 		
@@ -212,6 +219,9 @@ class DefaultAssetLibrary extends AssetLibrary {
 		
 		className.set ("data/fonts/Seraphimb1/Seraphimb1.woff", __ASSET__data_fonts_seraphimb1_seraphimb1_woff);
 		type.set ("data/fonts/Seraphimb1/Seraphimb1.woff", AssetType.BINARY);
+		
+		className.set ("data/graphics/dog.png", __ASSET__data_graphics_dog_png);
+		type.set ("data/graphics/dog.png", AssetType.IMAGE);
 		
 		className.set ("data/graphics/tiles.png", __ASSET__data_graphics_tiles_png);
 		type.set ("data/graphics/tiles.png", AssetType.IMAGE);
@@ -872,6 +882,7 @@ class DefaultAssetLibrary extends AssetLibrary {
 @:keep @:bind #if display private #end class __ASSET__data_fonts_seraphimb1_seraphimb1_eot extends flash.utils.ByteArray { }
 @:keep @:bind #if display private #end class __ASSET__data_fonts_seraphimb1_seraphimb1_ttf extends flash.text.Font { }
 @:keep @:bind #if display private #end class __ASSET__data_fonts_seraphimb1_seraphimb1_woff extends flash.utils.ByteArray { }
+@:keep @:bind #if display private #end class __ASSET__data_graphics_dog_png extends flash.display.BitmapData { public function new () { super (0, 0, true, 0); } }
 @:keep @:bind #if display private #end class __ASSET__data_graphics_tiles_png extends flash.display.BitmapData { public function new () { super (0, 0, true, 0); } }
 
 
@@ -888,6 +899,7 @@ class DefaultAssetLibrary extends AssetLibrary {
 
 
 @:keep #if display private #end class __ASSET__data_fonts_seraphimb1_seraphimb1_ttf extends lime.text.Font { public function new () { super (); name = "Seraphimb1"; } } 
+
 
 
 
@@ -911,6 +923,7 @@ class DefaultAssetLibrary extends AssetLibrary {
 @:file("data/fonts/Seraphimb1/Seraphimb1.eot") #if display private #end class __ASSET__data_fonts_seraphimb1_seraphimb1_eot extends lime.utils.Bytes {}
 @:font("data/fonts/Seraphimb1/Seraphimb1.ttf") #if display private #end class __ASSET__data_fonts_seraphimb1_seraphimb1_ttf extends lime.text.Font {}
 @:file("data/fonts/Seraphimb1/Seraphimb1.woff") #if display private #end class __ASSET__data_fonts_seraphimb1_seraphimb1_woff extends lime.utils.Bytes {}
+@:image("data/graphics/dog.png") #if display private #end class __ASSET__data_graphics_dog_png extends lime.graphics.Image {}
 @:image("data/graphics/tiles.png") #if display private #end class __ASSET__data_graphics_tiles_png extends lime.graphics.Image {}
 
 

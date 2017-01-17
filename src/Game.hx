@@ -3,6 +3,7 @@ import haxe.ds.Vector;
 import Entity;
 
 using haxegon.MathExtensions;
+using Lambda;
 
 enum GameState {
     GameState_PlayerTurn;
@@ -10,6 +11,7 @@ enum GameState {
     GameState_EnemyVisual;
     GameState_TurnResult;
     GameState_ItemDrag;
+    GameState_CardFlip;
 }
 
 enum CardType {
@@ -23,35 +25,43 @@ enum CardType {
 class Card {
     var type = CardType_None;
     var covered = false;
+    var age = 0;
+    var x = 0;
+    var y = 0;
 
     function new() {}
 }
 
 @:publicFields
 class Game {
+    static inline var DRAW_COORDINATES = false;
     static inline var tilesize = 64;
-    static inline var cardmap_width = 4;
+    static inline var cardmap_width = 5;
     static inline var cardmap_height = 3;
     static inline var card_width = 3;
     static inline var card_height = 5;
     static inline var map_width = cardmap_width * card_width;
     static inline var map_height = cardmap_height * card_height;
     static inline var inventory_slots = 5;
-    static inline var inventory_x = 800;
+    static inline var inventory_x = 1000;
     static inline var inventory_y = 64;
     static inline var inventory_slot_size = 64;
 
     var state = GameState_PlayerTurn;
-    var state_timer = 0;
+    var state_timer = 0; // reset to 0 by state at completion
     static inline var visual_timer_max = 5;
+    static inline var card_flip_timer_max = 30;
+    var flipped_card = {x: 0, y: 0};
     var drag_dx = 0;
     var drag_dy = 0;
     var dragged_item:Item = null;
 
-    var flipped_card_last_turn_timer = 0;
-
     var walls = Data.bool_2dvector(map_width, map_height);
     var cards = new Vector<Vector<Card>>(cardmap_width);
+    var cards_uncovered = 0;
+    static inline var total_cards = cardmap_width * cardmap_height;
+    static inline var card_update_timer_max = 10; // turns
+    var card_update_timer = card_update_timer_max;
 
     var player:Player;
 
@@ -83,6 +93,10 @@ class Game {
     }
 
     function new() {
+        // Canvas for card flip animation
+        Gfx.create_image("card_front", card_width * tilesize, card_height * tilesize);
+        Gfx.create_image("card_back", card_width * tilesize, card_height * tilesize);
+        Gfx.create_image("map_canvas", map_width * tilesize, map_height * tilesize);
 
         for (i in 0...inventory_slots) {
             inventory[i] = null;
@@ -94,59 +108,68 @@ class Game {
 
             for (j in 0...cards[i].length) {
                 cards[i][j] = new Card();
+                cards[i][j].x = i;
+                cards[i][j].y = j;
                 // NOTE: watch out for when you add more card types that should not be rare
                 cards[i][j].type = random_enum(CardType, 1);
                 cards[i][j].covered = true;
             }
         }
         cards[0][0].covered = false;
+        cards_uncovered = 1;
         cards[0][0].type = CardType_None;
 
         for (x in 0...cardmap_width) {
             for (y in 0...cardmap_height) {
-                for (i in 0...card_width) {
-                    for (j in 0...card_height) {
-                        walls[x * card_width + i][y * card_height + j] = Random.chance(10);
-                    }
-                }
-
-                if (cards[x][y].type == CardType_Dude) {
-                    // Spawn dude
-                    var dude = new Dude();
-                    dude.x = x * card_width + Random.int(0, card_width - 1);
-                    dude.y = y * card_height + Random.int(0, card_height - 1);
-                    dude.real_x = dude.x * tilesize;
-                    dude.real_y = dude.y * tilesize;
-                    walls[dude.x][dude.y] = false;
-                } else if (cards[x][y].type == CardType_Treasure) {
-                    // Spawn random item
-                    var item = new Item();
-                    item.x = x * card_width + Random.int(0, card_width - 1);
-                    item.y = y * card_height + Random.int(0, card_height - 1);
-                    item.type = random_enum(ItemType, 1);
-                    if (item.type == ItemType_Consumable) {
-                        item.consumable_type = random_enum(ConsumableType);
-                        item.value = 2;
-                        item.tile = Tiles.Potion;
-                    } else if (item.type == ItemType_Armor) {
-                        item.armor_type = random_enum(ArmorType, 1);
-                        item.value = 5;
-                        switch (item.armor_type) {
-                            case ArmorType_Chest: item.tile = Tiles.Armor;
-                            default: item.tile = Tiles.Ball;
-                        }
-                    }
-                    walls[item.x][item.y] = false;
-                }
+                generate_card_front(cards[x][y]);
             }
         }
 
         player = new Player();
         player.x = 2;
         player.y = 1;
+        walls[player.x][player.y] = false;
         player.real_x = player.x * tilesize;
         player.real_y = player.y * tilesize;
-        walls[player.x][player.y] = false;
+
+
+    }
+
+    function generate_card_front(card:Card) {
+        for (i in 0...card_width) {
+            for (j in 0...card_height) {
+                walls[card.x * card_width + i][card.y * card_height + j] = Random.chance(10);
+            }
+        }
+
+        if (card.type == CardType_Dude) {
+            // Spawn dude
+            var dude = new Dude();
+            dude.x = card.x * card_width + Random.int(0, card_width - 1);
+            dude.y = card.y * card_height + Random.int(0, card_height - 1);
+            dude.real_x = dude.x * tilesize;
+            dude.real_y = dude.y * tilesize;
+            walls[dude.x][dude.y] = false;
+        } else if (card.type == CardType_Treasure) {
+            // Spawn random item
+            var item = new Item();
+            item.x = card.x * card_width + Random.int(0, card_width - 1);
+            item.y = card.y * card_height + Random.int(0, card_height - 1);
+            item.type = random_enum(ItemType, 1);
+            if (item.type == ItemType_Consumable) {
+                item.consumable_type = random_enum(ConsumableType);
+                item.value = 2;
+                item.tile = Tiles.Potion;
+            } else if (item.type == ItemType_Armor) {
+                item.armor_type = random_enum(ArmorType, 1);
+                item.value = 5;
+                switch (item.armor_type) {
+                    case ArmorType_Chest: item.tile = Tiles.Armor;
+                    default: item.tile = Tiles.Ball;
+                }
+            }
+            walls[item.x][item.y] = false;
+        }
     }
 
     function a_star(x1:Int, y1:Int, x2:Int, y2:Int):Array<IntVector2> {
@@ -167,15 +190,40 @@ class Game {
             return path;
         }
 
-        var dude_map = Data.bool_2dvector(map_width, map_height, false);
+        var move_map = Data.bool_2dvector(map_width, map_height, true);
         for (dude in Entity.get(Dude)) {
-            dude_map[dude.x + dude.dx][dude.y + dude.dy] = true;
+            move_map[dude.x + dude.dx][dude.y + dude.dy] = false;
         }
-        dude_map[x1][y1] = false; // ignore the dude itself
+        move_map[x1][y1] = false; // ignore the dude itself
+        for (x in 0...map_width) {
+            for (y in 0...map_height) {
+                if (walls[x][y]) {
+                    move_map[x][y] = false;
+                }
+            }
+        }
+        for (x in 0...cardmap_width) {
+            for (y in 0...cardmap_height) {
+                if (cards[x][y].covered) {
+                    for (x2 in 0...card_width) {
+                        for (y2 in 0...card_height) {
+                            move_map[x * card_width + x2][y * card_height + y2] = false;
+                        }
+                    }
+                }
+            }
+        }
         var infinity = 10000000;
         var closed = Data.bool_2dvector(map_width, map_height, false);
         var open = Data.bool_2dvector(map_width, map_height, false);
         open[x1][y1] = true;
+        for (x in 0...cardmap_width) {
+            for (y in 0...cardmap_height) {
+                if (!move_map[x][y]) {
+                    open[x][y] = false;
+                }
+            }
+        }
         var open_length = 1;
         var prev = new Vector<Vector<IntVector2>>(map_width);
         for (x in 0...map_width) {
@@ -221,7 +269,7 @@ class Game {
                     }
                     var neighbor_x = Std.int(current.x + dx);
                     var neighbor_y = Std.int(current.y + dy);
-                    if (out_of_bounds(neighbor_x, neighbor_y) || walls[neighbor_x][neighbor_y] || dude_map[neighbor_x][neighbor_y]) {
+                    if (out_of_bounds(neighbor_x, neighbor_y) || !move_map[neighbor_x][neighbor_y]) {
                         continue;
                     }
 
@@ -253,6 +301,14 @@ class Game {
                     Gfx.draw_tile(x * tilesize, y * tilesize, Tiles.Wall);
                 } else {
                     Gfx.draw_tile(x * tilesize, y * tilesize, Tiles.Space);
+                }
+            }
+        }
+
+        if (DRAW_COORDINATES) {
+            for (dx in -2...3) {
+                for (dy in -2...3) {
+                    Text.display((player.x + dx) * tilesize + 5, (player.y + dy) * tilesize + 10, '${(player.x + dx)},${(player.y + dy)}');
                 }
             }
         }
@@ -298,7 +354,8 @@ class Game {
                         case CardType_None: card_color = Col.PINK;
                     }
                     Gfx.fill_box(x * card_width * tilesize, y * card_height * tilesize,
-                        card_width * tilesize, card_height * tilesize, card_color, 0.4);
+                        card_width * tilesize, card_height * tilesize, card_color, 0.8);
+                    // Gfx.draw_image(x * card_width * tilesize, y * card_height * tilesize, "card");
                 }
             }
         }
@@ -308,11 +365,11 @@ class Game {
             Text.display(Mouse.x - drag_dx, Mouse.y - drag_dy, dragged_item.name);
         }
 
-        Text.display(800, 0, '${Gfx.render_fps()}');
-        Text.display(800, 30, '${state}');
+        Text.display(inventory_x, 0, '${Gfx.render_fps()}');
+        Text.display(inventory_x, 30, '${state}');
 
-        Text.display(800, 500, 'Health: ${player.hp}');
-        Text.display(800, 540, 'Armor: ${player.armor}');
+        Text.display(inventory_x, 500, 'Health: ${player.hp}');
+        Text.display(inventory_x, 540, 'Armor: ${player.armor}');
     }
 
     function out_of_bounds(x:Int, y:Int):Bool {
@@ -410,11 +467,6 @@ class Game {
         if (Input.pressed(Key.DOWN)) {
             player.dy++;
         }
-        if (flipped_card_last_turn_timer != 0) {
-            player.dx = 0;
-            player.dy = 0;
-            flipped_card_last_turn_timer--;
-        }
         // No diagonal movement
         if (player.dy != 0 && player.dx != 0) {
             player.dx = 0;
@@ -424,11 +476,30 @@ class Game {
         var move_y = player.y + player.dy;
         if (!out_of_bounds(move_x, move_y)) {
             var move_card = card_at_position(move_x, move_y);
-            var player_flipped_card = false;
             if (cards[move_card.x][move_card.y].covered) {
+                state = GameState_CardFlip;
+                flipped_card.x = move_card.x;
+                flipped_card.y = move_card.y;
+
+                // Draw flipped card sides for animation
+                Gfx.draw_to_image("map_canvas");
+                Gfx.clear_screen(Col.BLACK);
+                render();
+                Gfx.draw_to_image("card_back");
+                Gfx.clear_screen(Col.BLACK);
+                Gfx.draw_image(-move_card.x * card_width * tilesize, -move_card.y * card_height * tilesize, "map_canvas");
+
                 cards[move_card.x][move_card.y].covered = false;
-                player_flipped_card = true;
-                flipped_card_last_turn_timer = 5;
+                Gfx.draw_to_image("map_canvas");
+                Gfx.clear_screen(Col.BLACK);
+                render();
+                cards[move_card.x][move_card.y].covered = true;
+                Gfx.draw_to_image("card_front");
+                Gfx.clear_screen(Col.BLACK);
+                Gfx.draw_image(-move_card.x * card_width * tilesize, -move_card.y * card_height * tilesize, "map_canvas");
+
+                Gfx.draw_to_screen();
+
 
                 for (dude in Entity.get(Dude)) {
                     var dude_card = card_at_position(dude.x, dude.y);
@@ -437,7 +508,7 @@ class Game {
                     }
                 }
             }
-            if ((player.dx != 0 || player.dy != 0) && !player_flipped_card && space_is_free(move_x, move_y, player)) {
+            if ((player.dx != 0 || player.dy != 0) && state != GameState_CardFlip && space_is_free(move_x, move_y, player)) {
                 state = GameState_PlayerVisual;
                 player.moved = true;
                 player.attacked = false;
@@ -725,9 +796,95 @@ class Game {
             }
         }
 
+        for (x in 0...cardmap_width) {
+            for (y in 0...cardmap_height) {
+                if (!cards[x][y].covered) {
+                    cards[x][y].age++;
+                }
+            }
+        }
+
+        var uncovered_percentage = cards_uncovered / total_cards;
+        // Start updating cards when more than 30% cards are uncovered
+        if (uncovered_percentage > 0.3) {
+            card_update_timer--;
+            if (uncovered_percentage > 0.7) {
+                // If more than 70% cards are uncovered, update faster
+                card_update_timer--;
+            }
+            if (card_update_timer <= 0) {
+                // Update a card
+                var card_queue = new Array<Card>();
+                for (x in 0...cardmap_width) {
+                    for (y in 0...cardmap_height) {
+                        if (!cards[x][y].covered) {
+                            card_queue.push(cards[x][y]);
+                        }
+                    }
+                }
+                card_queue.sort(function(x, y) {return y.age - x.age;});
+
+                function is_empty(card:Card) {
+                    if (Std.int(player.x / card_width) == card.x && Std.int(player.y / card_height) == card.y) {
+                        return false;
+                    }
+                    for (dude in Entity.get(Dude)) {
+                        if (Std.int(dude.x / card_width) == card.x && Std.int(dude.y / card_height) == card.y) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+
+                function is_completed(card:Card) {
+                    // TODO: add check for treasure cards, boss cards, etc.
+                    return true;
+                }
+
+                var updated_card:Card = null;
+                for (card in card_queue) {
+                    if (is_empty(card) && is_completed(card)) {
+                        updated_card = card;
+                        break;
+                    }
+                }
+
+                if (updated_card != null) {
+                    card_update_timer = card_update_timer_max;
+                    updated_card.type = random_enum(CardType, 1);
+                    updated_card.covered = true;
+                    generate_card_front(updated_card);
+                    cards_uncovered--;
+                }
+            }
+        }
+
         render();
 
         state = GameState_PlayerTurn;
+    }
+
+    function update_card_flip() {
+        render();
+        Gfx.fill_box(flipped_card.x * card_width * tilesize, flipped_card.y * card_height * tilesize, card_width * tilesize, card_height * tilesize, Col.BLACK);
+        if (state_timer / card_flip_timer_max < 0.5) {
+            Gfx.scale(1 - 2 * state_timer / card_flip_timer_max, 1);
+            Gfx.draw_image(flipped_card.x * card_width * tilesize, flipped_card.y * card_height * tilesize, "card_back");
+            Gfx.scale(1, 1);
+        } else {
+            Gfx.scale(2 * (state_timer / card_flip_timer_max - 0.5), 1);
+            Gfx.draw_image(flipped_card.x * card_width * tilesize, flipped_card.y * card_height * tilesize, "card_front");
+            Gfx.scale(1, 1);
+        }
+        Text.display(0, 0, '${state_timer}', Col.YELLOW);
+
+        state_timer++;
+        if (state_timer > card_flip_timer_max) {
+            state = GameState_PlayerTurn;
+            state_timer = 0;
+            cards[flipped_card.x][flipped_card.y].covered = false;
+            cards_uncovered++;
+        }
     }
 
     function update() {
@@ -737,6 +894,7 @@ class Game {
             case GameState_PlayerVisual: update_player_visual();
             case GameState_EnemyVisual: update_enemy_visual();
             case GameState_TurnResult: update_turn_result();
+            case GameState_CardFlip: update_card_flip();
         }
     }
 }

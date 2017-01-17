@@ -7,7 +7,7 @@ enum MainState {
 
 @:publicFields
 class Main {
-    static inline var screen_width = 1100;
+    static inline var screen_width = 1300;
     static inline var screen_height = 1000;
     static var state = MainState_Game;
     static var game: Game;
@@ -17,6 +17,7 @@ class Main {
         Text.setfont("Seraphimb1", 30);
 
         Gfx.load_tiles("tiles", Game.tilesize, Game.tilesize);
+        Gfx.load_image("card");
 
         game = new Game();
     }

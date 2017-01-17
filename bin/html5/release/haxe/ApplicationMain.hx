@@ -78,6 +78,10 @@ class ApplicationMain {
 		types.push (lime.Assets.AssetType.BINARY);
 		
 		
+		urls.push ("data/graphics/dog.png");
+		types.push (lime.Assets.AssetType.IMAGE);
+		
+		
 		urls.push ("data/graphics/tiles.png");
 		types.push (lime.Assets.AssetType.IMAGE);
 		
@@ -143,7 +147,7 @@ class ApplicationMain {
 		
 		config = {
 			
-			build: "252",
+			build: "319",
 			company: "",
 			file: "game",
 			fps: 60,

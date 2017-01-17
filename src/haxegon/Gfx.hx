@@ -111,9 +111,6 @@ class Gfx {
         reset_ifclear();
     }
 
-    /** Scales image drawing functions. Optionally takes a second argument
-    * to scale X and Y seperately. */
-
     public static function scale(xscale: Float, yscale: Float, xpivot: Float = -15000, ypivot: Float = -15000) {
         imagexscale = xscale;
         imageyscale = yscale;
@@ -1195,7 +1192,7 @@ class Gfx {
     //Actual backgrounds
     public static var screen: Bitmap;
     private static var tempshape: Shape = new Shape();
-    private static var shapematrix: Matrix = new Matrix();
+    public static var shapematrix: Matrix = new Matrix();
 
     private static var alphamult: Int;
     private static var gfxstage: Stage;
