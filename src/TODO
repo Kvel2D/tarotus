@@ -1,12 +1,9 @@
-fix movement bugs(dude walks on covered card)
-player can move onto dude sometimes?
-dude can move onto player sometimes?
-enemy hp indicator
 mock up specific cards
-implement other weapons:
-fists(for when you don't have anything else)
+implement weapons:
+sword
 spear(hits two squares, takes an extra turn?)
 bow(hits in a line, takes an extra turn or requires arrows which are limited
+make multi-turn weapons auto, can't cancel, next turn is performed automatically for you
 
 be on the lookout for more movement bugs
 

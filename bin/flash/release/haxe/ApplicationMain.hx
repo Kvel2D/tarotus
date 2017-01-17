@@ -78,7 +78,15 @@ class ApplicationMain {
 		types.push (lime.Assets.AssetType.BINARY);
 		
 		
+		urls.push ("data/graphics/card.png");
+		types.push (lime.Assets.AssetType.IMAGE);
+		
+		
 		urls.push ("data/graphics/dog.png");
+		types.push (lime.Assets.AssetType.IMAGE);
+		
+		
+		urls.push ("data/graphics/persona_tarot_card_hd___back_by_ipswich67-d4on9zw.png");
 		types.push (lime.Assets.AssetType.IMAGE);
 		
 		
@@ -147,7 +155,7 @@ class ApplicationMain {
 		
 		config = {
 			
-			build: "295",
+			build: "471",
 			company: "",
 			file: "game",
 			fps: 60,

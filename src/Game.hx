@@ -35,6 +35,7 @@ class Card {
 @:publicFields
 class Game {
     static inline var DRAW_COORDINATES = false;
+    static inline var UPDATE_CARDS = false;
     static inline var tilesize = 64;
     static inline var cardmap_width = 5;
     static inline var cardmap_height = 3;
@@ -85,6 +86,8 @@ class Game {
     [false, true, false, true, false],
     ];
 
+    var history = new Array<Array<String>>();
+
     // start_index is used to skip EnumType_None
 
     function random_enum(enum_type:Dynamic, start_index:Int = 0):Dynamic {
@@ -133,6 +136,59 @@ class Game {
         player.real_y = player.y * tilesize;
 
 
+    }
+
+    function serialize(entity:Dynamic) {
+        var fields = Type.getInstanceFields(Type.getClass(entity));
+        var fields_string = "";
+        for (f in fields) {
+            var field = Std.string(Reflect.field(entity, f));
+            if (field.indexOf('function') != -1) {
+                continue;
+            }
+            var enum_type = Type.resolveEnum(field.split('_')[0]);
+            if (enum_type != null) {
+                // for enums record it's index
+                var enums = Type.allEnums(enum_type);
+                for (i in 0...enums.length) {
+                    if (Std.string(enums[i]) == field) {
+                        // enumname_enumindex
+                        fields_string += f + '=' + field.split('_')[0] + '_' + i + '|';
+                        break;
+                    }
+                }
+            } else {
+                fields_string += f + '=' + field + '|';
+            }
+        }
+        return fields_string;
+    }
+
+    function unserialize(entity:Dynamic, fields_string:String) {
+        var fields = fields_string.split('|');
+        fields.splice(fields.length - 1, 1);
+        for (f in fields) {
+            var pair = f.split('=');
+            if ((~/^\d+$/).match(pair[0])) {
+                // Number
+                Reflect.setField(entity, pair[0], Std.parseFloat(pair[1]));
+            } else if (pair[1] == 'false') {
+                // Bool
+                Reflect.setField(entity, pair[0], false);
+            } else if (pair[1] == 'true') {
+                // Bool
+                Reflect.setField(entity, pair[0], true);
+            } else if (Type.resolveEnum(pair[1].split('_')[0]) != null) {
+                // Enum
+                var enum_type = Type.resolveEnum(pair[1].split('_')[0]);
+                var enum_index = Std.parseInt(pair[1].split('_')[1]);
+                var enum_value = Type.allEnums(enum_type)[enum_index];
+                Reflect.setField(entity, pair[0], enum_value);
+            } else {
+                // String
+                Reflect.setField(entity, pair[0], pair[1]);
+            }
+        }
     }
 
     function generate_card_front(card:Card) {
@@ -322,13 +378,6 @@ class Game {
         }
         Gfx.line_thickness = 1;
 
-
-        Gfx.draw_tile(player.real_x, player.real_y, Tiles.Player);
-
-        for (dude in Entity.get(Dude)) {
-            Gfx.draw_tile(dude.real_x, dude.real_y, Tiles.Dude);
-        }
-
         for (item in Entity.get(Item)) {
             if (item.on_ground) {
                 Gfx.draw_tile(item.x * tilesize, item.y * tilesize, item.tile);
@@ -341,6 +390,13 @@ class Game {
                 Gfx.draw_tile(inventory_x, inventory_y + i * inventory_slot_size, inventory[i].tile);
                 Text.display(inventory_x, inventory_y + i * inventory_slot_size, inventory[i].name);
             }
+        }
+
+        Gfx.draw_tile(player.real_x, player.real_y, Tiles.Player);
+
+        for (dude in Entity.get(Dude)) {
+            Gfx.draw_tile(dude.real_x, dude.real_y, Tiles.Dude);
+            Text.display(dude.real_x, dude.real_y, '${dude.hp}/${dude.hp_max}', Col.WHITE);
         }
 
         for (x in 0...cardmap_width) {
@@ -399,55 +455,6 @@ class Game {
 
         function card_at_position(x:Int, y:Int):IntVector2 {
             return {x: Std.int(x / card_width), y: Std.int(y / card_height)};
-        }
-
-        // Replace random uncovered card
-        if (Input.just_pressed(Key.SPACE)) {
-            var uncovered_cards = new Array<IntVector2>();
-            for (x in 0...cardmap_width) {
-                for (y in 0...cardmap_height) {
-                    if (!cards[x][y].covered) {
-                        uncovered_cards.push({x: x, y: y});
-                    }
-                }
-            }
-
-            if (uncovered_cards.length > 1) {
-                var k = 0;
-                var player_card = card_at_position(player.x, player.y);
-                var selected_card = player_card;
-                while (selected_card.x == player_card.x && selected_card.y == player_card.y) {
-                    k = Random.int(0, uncovered_cards.length - 1);
-                    selected_card = uncovered_cards[k];
-                }
-
-                cards[selected_card.x][selected_card.y].covered = true;
-                var removed_dudes = new Array<Dude>();
-                for (dude in Entity.get(Dude)) {
-                    var dude_card = card_at_position(dude.x, dude.y);
-                    if (dude_card.x == selected_card.x && dude_card.y == selected_card.y) {
-                        removed_dudes.push(dude);
-                    }
-                }
-                var dudes = Entity.get(Dude);
-                for (dude in removed_dudes) {
-                    dudes.remove(dude);
-                }
-
-
-                var h = Random.int(1, 3);
-                var new_card = card_a;
-                switch (h) {
-                    case 1: new_card = card_a;
-                    case 2: new_card = card_b;
-                    case 3: new_card = card_c;
-                }
-                for (x in 0...card_width) {
-                    for (y in 0...card_height) {
-                        walls[selected_card.x * card_width + x][selected_card.y * card_height + y] = new_card[x][y];
-                    }
-                }
-            }
         }
 
         //
@@ -767,8 +774,11 @@ class Game {
                 }
             }
             if (hit_dude != null) {
-                var dudes = Entity.get(Dude);
-                dudes.remove(hit_dude);
+                hit_dude.hp--;
+                if (hit_dude.hp <= 0) {
+                    var dudes = Entity.get(Dude);
+                    dudes.remove(hit_dude);
+                }
             }
         }
         player.moved = false;
@@ -806,7 +816,7 @@ class Game {
 
         var uncovered_percentage = cards_uncovered / total_cards;
         // Start updating cards when more than 30% cards are uncovered
-        if (uncovered_percentage > 0.3) {
+        if (uncovered_percentage > 0.3 && UPDATE_CARDS) {
             card_update_timer--;
             if (uncovered_percentage > 0.7) {
                 // If more than 70% cards are uncovered, update faster
@@ -862,6 +872,15 @@ class Game {
         render();
 
         state = GameState_PlayerTurn;
+
+
+        var entity_states = new Array<String>();
+        entity_states.push(serialize(player));
+        for (dude in Entity.get(Dude)) {
+            entity_states.push(serialize(dude));
+        }
+        history.push(entity_states);
+        player.test = TestEnum_B;
     }
 
     function update_card_flip() {
@@ -888,6 +907,20 @@ class Game {
     }
 
     function update() {
+        if (Input.just_pressed(Key.Z) && history.length > 0 && state == GameState_PlayerTurn) {
+            var previous_state = history.pop();
+            unserialize(player, previous_state[0]);
+            player.dx = 0;
+            player.dy = 0;
+            Entity.get(Dude).splice(0, Entity.get(Dude).length);
+            for (i in 1...previous_state.length) {
+                var dude = new Dude();
+                unserialize(dude, previous_state[i]);
+                dude.dx = 0;
+                dude.dy = 0;
+            }
+        }
+
         switch (state) {
             case GameState_PlayerTurn: update_player_turn();
             case GameState_ItemDrag: update_item_drag();

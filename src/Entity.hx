@@ -1,7 +1,4 @@
-import haxegon.*;
-import haxegon.IntVector2;
 import haxe.ds.ObjectMap;
-
 
 enum DoorColor {
 	DoorColor_White;
@@ -50,6 +47,13 @@ class Entity {
 	}
 }
 
+enum WeaponType {
+	WeaponType_None;
+	WeaponType_Sword;
+	WeaponType_Spear;
+	WeaponType_Bow;
+}
+
 class Player extends Entity {
 	var x = 0;
 	var y = 0;
@@ -63,6 +67,8 @@ class Player extends Entity {
 	var hp = 5;
 	var hp_max = 10;
 	var armor = 0;
+
+	var weapon = WeaponType_None;
 }
 
 class Dude extends Entity {
@@ -76,6 +82,9 @@ class Dude extends Entity {
 	var dx = 0;
 	var dy = 0;
 	var dead = false;
+	static var classs = Dude;
+	var hp = 1;
+	var hp_max = 1;
 }
 
 enum ItemType {
