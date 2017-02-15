@@ -771,6 +771,25 @@ class Gfx {
         drawto.draw(tempshape, shapematrix);
     }
 
+    public static function fill_tri_array(tri: Array<Float>, col: Int, alpha: Float = 1.0) {
+        if (tri.length != 6) {
+            trace("Gfx.fill_tri_array(): tri array size must be 6");
+            return;
+        }
+        if (!clearscreeneachframe) if (skiprender && drawingtoscreen) return;
+        tempshape.graphics.clear();
+        tempshape.graphics.beginFill(col, alpha);
+        tempshape.graphics.lineTo(0, 0);
+        tempshape.graphics.lineTo(tri[2] - tri[0], tri[3] - tri[1]);
+        tempshape.graphics.lineTo(tri[4] - tri[0], tri[5] - tri[1]);
+        tempshape.graphics.lineTo(0, 0);
+        tempshape.graphics.endFill();
+
+        shapematrix.identity();
+        shapematrix.translate(tri[0], tri[1]);
+        drawto.draw(tempshape, shapematrix);
+    }
+
     public static function fill_tri(x1: Float, y1: Float, x2: Float, y2: Float, x3: Float, y3: Float, col: Int, alpha: Float = 1.0) {
         if (!clearscreeneachframe) if (skiprender && drawingtoscreen) return;
         tempshape.graphics.clear();

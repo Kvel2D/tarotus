@@ -108,8 +108,8 @@ class MathExtensions {
     }
 
     static function rotate_vector(math: Class<Math> = null, point: Vector2, origin_x: Float, origin_y: Float, angle: Float) {
-        var cos = Math.cos(angle);
-        var sin = Math.sin(angle);
+        var cos = Math.cos(deg_to_rad(angle));
+        var sin = Math.sin(deg_to_rad(angle));
         point.x -= origin_x;
         point.y -= origin_y;
         var temp_x = point.x;

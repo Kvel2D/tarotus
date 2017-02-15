@@ -15,4 +15,8 @@ class Tiles {
     static inline var Stick = tilenum(6, 0);
     static inline var Armor = tilenum(7, 0);
     static inline var Potion = tilenum(8, 0);
+    static inline var Sword = tilenum(9, 0);
+    static inline var Spear = tilenum(9, 1);
+    static inline var Bow = tilenum(8, 1);
+    static inline var Fist = tilenum(7, 1);
 }

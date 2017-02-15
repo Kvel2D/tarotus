@@ -8,8 +8,9 @@ using Lambda;
 enum GameState {
     GameState_PlayerTurn;
     GameState_PlayerVisual;
+    GameState_PlayerTurnResult;
     GameState_EnemyVisual;
-    GameState_TurnResult;
+    GameState_EnemyTurnResult;
     GameState_ItemDrag;
     GameState_CardFlip;
 }
@@ -50,7 +51,8 @@ class Game {
 
     var state = GameState_PlayerTurn;
     var state_timer = 0; // reset to 0 by state at completion
-    static inline var visual_timer_max = 5;
+    static inline var visual_timer_max = 7;
+    static inline var weapon_visual_timer_max = 10;
     static inline var card_flip_timer_max = 30;
     var flipped_card = {x: 0, y: 0};
     var drag_dx = 0;
@@ -134,8 +136,6 @@ class Game {
         walls[player.x][player.y] = false;
         player.real_x = player.x * tilesize;
         player.real_y = player.y * tilesize;
-
-
     }
 
     function serialize(entity:Dynamic) {
@@ -395,8 +395,10 @@ class Game {
         Gfx.draw_tile(player.real_x, player.real_y, Tiles.Player);
 
         for (dude in Entity.get(Dude)) {
-            Gfx.draw_tile(dude.real_x, dude.real_y, Tiles.Dude);
-            Text.display(dude.real_x, dude.real_y, '${dude.hp}/${dude.hp_max}', Col.WHITE);
+            if (!dude.dead) {
+                Gfx.draw_tile(dude.real_x, dude.real_y, Tiles.Dude);
+                Text.display(dude.real_x, dude.real_y, '${dude.hp}/${dude.hp_max}', Col.WHITE);
+            }
         }
 
         for (x in 0...cardmap_width) {
@@ -553,16 +555,6 @@ class Game {
                 player.attacked = true;
                 player.moved = false;
             }
-
-            if (player.attacked) {
-                // Mark dude if he was killed, so that he doesn't take a turn
-                for (dude in Entity.get(Dude)) {
-                    if (dude.active && dude.x == player.x + player.dx && dude.y == player.y + player.dy) {
-                        // TODO: health system for dudes
-                        dude.dead = true;
-                    }
-                }
-            }
         }
 
         // Enemy turn
@@ -640,6 +632,8 @@ class Game {
         }
 
         render();
+
+        GUI.enum_setter(800, 100, function(x) { player.weapon = x; }, player.weapon, WeaponType);
     }
 
     function update_item_drag() {
@@ -716,19 +710,125 @@ class Game {
 
         render();
 
+        // Draw weapon
+        var angle = 0.0;
+        if (player.dx == 1 && player.dy == 0) {
+            angle = 0;
+        } else if (player.dx == 0 && player.dy == 1) {
+            angle = 90;
+        } else if (player.dx == -1 && player.dy == 0) {
+            angle = 180;
+        } else if (player.dx == 0 && player.dy == -1) {
+            angle = 270;
+        }
         if (player.attacked) {
-            var attack_progress = 1 - Math.abs(state_timer / visual_timer_max - 0.5);
-            var attack_dst = 50;
-            Gfx.fill_circle((player.x + 0.5) * tilesize + player.dx * attack_progress * attack_dst,
-                (player.y + 0.5) * tilesize + player.dy * attack_progress * attack_dst, 10, Col.RED);
+            switch (player.weapon) {
+                case WeaponType_None: {
+                    var attack_progress = 1 - Math.abs(state_timer / weapon_visual_timer_max - 0.5);
+                    var attack_dst = 50;
+                    Gfx.fill_circle((player.x + 0.5) * tilesize + player.dx * attack_progress * attack_dst,
+                        (player.y + 0.5) * tilesize + player.dy * attack_progress * attack_dst, 10, Col.RED);
+                }
+                case WeaponType_Sword: {
+                    var attack_progress = 1 - Math.abs(state_timer / weapon_visual_timer_max - 0.5);
+                    var attack_dst = 50;
+                    var tri = [0, tilesize / 4, 0, -tilesize / 4, tilesize / 4, 0];
+                    Math.rotate_vertices(tri, 0, 0, angle);
+                    Math.translate_vertices(tri, 
+                        (player.x + 0.5) * tilesize + player.dx * attack_progress * attack_dst,
+                        (player.y + 0.5) * tilesize + player.dy * attack_progress * attack_dst);
+                    Gfx.fill_tri_array(tri, Col.RED);
+                }
+                case WeaponType_Spear: {
+                    var attack_progress = 1 - Math.abs(state_timer / weapon_visual_timer_max - 0.5);
+                    var attack_dst = 100;
+                    var tri = [0, tilesize / 8, 0, -tilesize / 8, tilesize / 3, 0];
+                    Math.rotate_vertices(tri, 0, 0, angle);
+                    Math.translate_vertices(tri, 
+                        (player.x + 0.5) * tilesize + player.dx * attack_progress * attack_dst,
+                        (player.y + 0.5) * tilesize + player.dy * attack_progress * attack_dst);
+                    Gfx.fill_tri_array(tri, Col.RED);
+                }
+                case WeaponType_Bow: {
+                    var attack_progress = 1 - Math.abs(state_timer / weapon_visual_timer_max - 0.5);
+                    var attack_dst = 200;
+                    var tri = [0, tilesize / 16, 0, -tilesize / 16, tilesize / 4, 0];
+                    Math.rotate_vertices(tri, 0, 0, angle);
+                    Math.translate_vertices(tri, 
+                        (player.x + 0.5) * tilesize + player.dx * attack_progress * attack_dst,
+                        (player.y + 0.5) * tilesize + player.dy * attack_progress * attack_dst);
+                    Gfx.fill_tri_array(tri, Col.RED);
+                }
+            }
         }
 
 
         state_timer++;
-        if (state_timer > visual_timer_max) {
-            state = GameState_EnemyVisual;
+        var max = visual_timer_max;
+        if (player.attacked) {
+            max = weapon_visual_timer_max;
+        }
+        if (state_timer > max) {
+            state = GameState_PlayerTurnResult;
             state_timer = 0;
         }
+    }
+
+    function update_player_turn_result() {
+        if (player.moved) {
+            player.x += player.dx;
+            player.y += player.dy;
+            player.real_x = player.x * tilesize;
+            player.real_y = player.y * tilesize;
+        } else if (player.attacked) {
+            // Remove hit dude
+            // TODO: add death visual
+            var hit_dude:Dude = null;
+            var hit_cells: Array<IntVector2>;
+            switch (player.weapon) {
+                case WeaponType_None: {
+                    hit_cells = [{x: player.x + player.dx, y: player.y + player.dy}];
+                }
+                case WeaponType_Sword: {
+                    hit_cells = [{x: player.x + player.dx, y: player.y + player.dy}];
+                }
+                case WeaponType_Spear: {
+                    hit_cells = [for (i in 1...3) {x: player.x + i * player.dx, y: player.y + i * player.dy}];
+                }
+                case WeaponType_Bow: {
+                    hit_cells = [for (i in 1...5) {x: player.x + i * player.dx, y: player.y + i * player.dy}];
+                }
+            }
+            for (dude in Entity.get(Dude)) {
+                if (dude.active) {
+                    for (cell in hit_cells) {
+                        if (dude.x == cell.x && dude.y == cell.y) {
+                            hit_dude = dude;
+                            break;
+                        }
+                    }
+                    if (hit_dude != null) {
+                        break;
+                    }
+                }
+            }
+            if (hit_dude != null) {
+                hit_dude.hp--;
+                if (hit_dude.hp <= 0) {
+                    hit_dude.dead = true;
+                    hit_dude.moved = false;
+                    hit_dude.attacked = false;
+                }
+            }
+        }
+        player.moved = false;
+        player.attacked = false;
+        player.dx = 0;
+        player.dy = 0;
+
+        render();
+
+        state = GameState_EnemyVisual;
     }
 
     function update_enemy_visual() {
@@ -742,7 +842,11 @@ class Game {
         render();
 
         for (dude in Entity.get(Dude)) {
-            if (dude.attacked) {
+            if (dude.dead) {
+                Gfx.rotation(20 * state_timer / visual_timer_max);
+                Gfx.draw_tile(dude.real_x, dude.real_y, Tiles.Dude);
+                Gfx.rotation(0);
+            } else if (dude.attacked) {
                 var attack_progress = 1 - Math.abs(state_timer / visual_timer_max - 0.5);
                 var attack_dst = 50;
                 Gfx.fill_circle((dude.x + 0.5) * tilesize + dude.dx * attack_progress * attack_dst,
@@ -753,40 +857,13 @@ class Game {
 
         state_timer++;
         if (state_timer > visual_timer_max) {
-            state = GameState_TurnResult;
+            state = GameState_EnemyTurnResult;
             state_timer = 0;
         }
     }
 
-    function update_turn_result() {
-        if (player.moved) {
-            player.x += player.dx;
-            player.y += player.dy;
-            player.real_x = player.x * tilesize;
-            player.real_y = player.y * tilesize;
-        } else if (player.attacked) {
-            // Remove hit dude
-            var hit_dude:Dude = null;
-            for (dude in Entity.get(Dude)) {
-                if (dude.active && dude.x == player.x + player.dx && dude.y == player.y + player.dy) {
-                    hit_dude = dude;
-                    break;
-                }
-            }
-            if (hit_dude != null) {
-                hit_dude.hp--;
-                if (hit_dude.hp <= 0) {
-                    var dudes = Entity.get(Dude);
-                    dudes.remove(hit_dude);
-                }
-            }
-        }
-        player.moved = false;
-        player.attacked = false;
-        player.dx = 0;
-        player.dy = 0;
-
-
+    function update_enemy_turn_result() {
+        var dead_dudes = new Array<Dude>();
         for (dude in Entity.get(Dude)) {
             if (dude.active) {
                 if (dude.moved) {
@@ -798,12 +875,19 @@ class Game {
                     if (player.x == dude.x + dude.dx && player.y == dude.y + dude.dy) {
                         player.hp--;
                     }
+                } else if (dude.dead) {
+                    dead_dudes.push(dude);
                 }
                 dude.moved = false;
                 dude.attacked = false;
                 dude.dx = 0;
                 dude.dy = 0;
             }
+        }
+
+        var dudes = Entity.get(Dude);
+        for (dude in dead_dudes) {
+            dudes.remove(dude);
         }
 
         for (x in 0...cardmap_width) {
@@ -880,7 +964,6 @@ class Game {
             entity_states.push(serialize(dude));
         }
         history.push(entity_states);
-        player.test = TestEnum_B;
     }
 
     function update_card_flip() {
@@ -925,8 +1008,9 @@ class Game {
             case GameState_PlayerTurn: update_player_turn();
             case GameState_ItemDrag: update_item_drag();
             case GameState_PlayerVisual: update_player_visual();
+            case GameState_PlayerTurnResult: update_player_turn_result();
             case GameState_EnemyVisual: update_enemy_visual();
-            case GameState_TurnResult: update_turn_result();
+            case GameState_EnemyTurnResult: update_enemy_turn_result();
             case GameState_CardFlip: update_card_flip();
         }
     }
