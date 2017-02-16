@@ -25,8 +25,18 @@
       <file leaf-file-name="Game.hx" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/Game.hx">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="-0.8361991">
-              <caret line="781" column="9" selection-start-line="781" selection-start-column="9" selection-end-line="781" selection-end-column="9" />
+            <state vertical-scroll-proportion="0.3728507">
+              <caret line="215" column="21" selection-start-line="215" selection-start-column="21" selection-end-line="215" selection-end-column="21" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="Walls.hx" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/Walls.hx">
+          <provider selected="true" editor-type-id="text-editor">
+            <state vertical-scroll-proportion="0.0">
+              <caret line="117" column="14" selection-start-line="117" selection-start-column="14" selection-end-line="117" selection-end-column="14" />
               <folding />
             </state>
           </provider>
@@ -36,7 +46,7 @@
         <entry file="file://$PROJECT_DIR$/src/Entity.hx">
           <provider selected="true" editor-type-id="text-editor">
             <state vertical-scroll-proportion="0.0">
-              <caret line="65" column="0" selection-start-line="65" selection-start-column="0" selection-end-line="65" selection-end-column="0" />
+              <caret line="83" column="0" selection-start-line="83" selection-start-column="0" selection-end-line="83" selection-end-column="0" />
               <folding />
             </state>
           </provider>
@@ -113,6 +123,7 @@
         <option value="$PROJECT_DIR$/src/Main.hx" />
         <option value="$PROJECT_DIR$/src/haxegon/Gfx.hx" />
         <option value="$PROJECT_DIR$/src/Entity.hx" />
+        <option value="$PROJECT_DIR$/src/Walls.hx" />
         <option value="$PROJECT_DIR$/src/Game.hx" />
       </list>
     </option>
@@ -430,7 +441,19 @@
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
-      <option name="time" value="338" />
+      <breakpoints>
+        <line-breakpoint enabled="true" type="Haxe">
+          <url>file://$PROJECT_DIR$/src/Game.hx</url>
+          <line>246</line>
+          <option name="timeStamp" value="347" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="Haxe">
+          <url>file://$PROJECT_DIR$/src/Game.hx</url>
+          <line>279</line>
+          <option name="timeStamp" value="348" />
+        </line-breakpoint>
+      </breakpoints>
+      <option name="time" value="349" />
     </breakpoint-manager>
     <watches-manager>
       <configuration name="HaxeApplicationRunConfiguration">
@@ -439,14 +462,6 @@
     </watches-manager>
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/src/Game.hx">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0">
-          <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/Main.hx">
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0">
@@ -788,15 +803,23 @@
     <entry file="file://$PROJECT_DIR$/src/Entity.hx">
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0">
-          <caret line="65" column="0" selection-start-line="65" selection-start-column="0" selection-end-line="65" selection-end-column="0" />
+          <caret line="83" column="0" selection-start-line="83" selection-start-column="0" selection-end-line="83" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/Walls.hx">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="0.0">
+          <caret line="117" column="14" selection-start-line="117" selection-start-column="14" selection-end-line="117" selection-end-column="14" />
           <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/Game.hx">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="-0.8361991">
-          <caret line="781" column="9" selection-start-line="781" selection-start-column="9" selection-end-line="781" selection-end-column="9" />
+        <state vertical-scroll-proportion="0.3728507">
+          <caret line="215" column="21" selection-start-line="215" selection-start-column="21" selection-end-line="215" selection-end-column="21" />
           <folding />
         </state>
       </provider>

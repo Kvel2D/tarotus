@@ -36,7 +36,9 @@ class Card {
 @:publicFields
 class Game {
     static inline var DRAW_COORDINATES = false;
-    static inline var UPDATE_CARDS = false;
+    static inline var UPDATE_CARDS = true;
+    static inline var DRAW_IMAGE_COVER = false;
+    static inline var DRAW_TRANSPARENT_COVER = false;
     static inline var tilesize = 64;
     static inline var cardmap_width = 5;
     static inline var cardmap_height = 3;
@@ -58,6 +60,7 @@ class Game {
     var drag_dx = 0;
     var drag_dy = 0;
     var dragged_item:Item = null;
+    var hover_info = "";
 
     var walls = Data.bool_2dvector(map_width, map_height);
     var cards = new Vector<Vector<Card>>(cardmap_width);
@@ -91,13 +94,14 @@ class Game {
     var history = new Array<Array<String>>();
 
     // start_index is used to skip EnumType_None
-
     function random_enum(enum_type:Dynamic, start_index:Int = 0):Dynamic {
         var k = Random.int(start_index, Type.allEnums(enum_type).length - 1);
         return Type.allEnums(enum_type)[k];
     }
 
     function new() {
+        Walls.generate();
+
         // Canvas for card flip animation
         Gfx.create_image("card_front", card_width * tilesize, card_height * tilesize);
         Gfx.create_image("card_back", card_width * tilesize, card_height * tilesize);
@@ -126,7 +130,7 @@ class Game {
 
         for (x in 0...cardmap_width) {
             for (y in 0...cardmap_height) {
-                generate_card_front(cards[x][y]);
+                generate_card(cards[x][y]);
             }
         }
 
@@ -136,6 +140,10 @@ class Game {
         walls[player.x][player.y] = false;
         player.real_x = player.x * tilesize;
         player.real_y = player.y * tilesize;
+    }
+
+    function update_dude_info(dude: Dude) {
+        dude.info = '${dude.name}\n${dude.hp}/${dude.hp_max}';
     }
 
     function serialize(entity:Dynamic) {
@@ -191,27 +199,69 @@ class Game {
         }
     }
 
-    function generate_card_front(card:Card) {
+    function generate_card(card:Card) {
+        var k = Random.int(0, Walls.all.length - 1);
+        var walls_preset = Walls.all[k];
         for (i in 0...card_width) {
             for (j in 0...card_height) {
-                walls[card.x * card_width + i][card.y * card_height + j] = Random.chance(10);
+                walls[card.x * card_width + i][card.y * card_height + j] = (walls_preset[i][j] == 1);
             }
+        }
+
+        function random_free_cell(card_x: Int, card_y: Int): IntVector2 {
+            var out: IntVector2 = {x: 0, y: 0};
+            var x_start = card.x * card_width;
+            var x_end = x_start + card_width;
+            var y_start = card.y * card_height;
+            var y_end = y_start + card_height;
+            
+            var free_cell_amount = 0;
+            for (x in x_start...x_end) {
+                for (y in y_start...y_end) {
+                    if (!walls[x][y]) {
+                        free_cell_amount++;
+                    }
+                }
+            }
+
+            var k = Random.int(0, free_cell_amount - 1);
+            var i = 0;
+            for (x in x_start...x_end) {
+                for (y in y_start...y_end) {
+                    if (!walls[x][y]) {
+                        if (i == k) {
+                            out.x = x;
+                            out.y = y;
+                            return out;
+                        }
+                        i++;
+                    }
+                }
+            }
+
+            return out;
         }
 
         if (card.type == CardType_Dude) {
             // Spawn dude
             var dude = new Dude();
-            dude.x = card.x * card_width + Random.int(0, card_width - 1);
-            dude.y = card.y * card_height + Random.int(0, card_height - 1);
+            var free_cell = random_free_cell(card.x, card.y);
+            dude.x = free_cell.x;
+            dude.y = free_cell.y;
             dude.real_x = dude.x * tilesize;
             dude.real_y = dude.y * tilesize;
             walls[dude.x][dude.y] = false;
+            update_dude_info(dude);
         } else if (card.type == CardType_Treasure) {
             // Spawn random item
             var item = new Item();
-            item.x = card.x * card_width + Random.int(0, card_width - 1);
-            item.y = card.y * card_height + Random.int(0, card_height - 1);
+            var free_cell = random_free_cell(card.x, card.y);
+            item.x = free_cell.x;
+            item.y = free_cell.y;
             item.type = random_enum(ItemType, 1);
+            
+            item.info += '\nI am ${item.type}!';
+
             if (item.type == ItemType_Consumable) {
                 item.consumable_type = random_enum(ConsumableType);
                 item.value = 2;
@@ -220,8 +270,18 @@ class Game {
                 item.armor_type = random_enum(ArmorType, 1);
                 item.value = 5;
                 switch (item.armor_type) {
-                    case ArmorType_Chest: item.tile = Tiles.Armor;
-                    default: item.tile = Tiles.Ball;
+                    case ArmorType_Chest: item.tile = Tiles.Chest;
+                    case ArmorType_Head: item.tile = Tiles.Head;
+                    case ArmorType_Legs: item.tile = Tiles.Legs;
+                    default: item.tile = Tiles.Wilhelm;
+                }
+            } else if (item.type == ItemType_Weapon) {
+                item.weapon_type = random_enum(WeaponType, 1);
+                switch (item.weapon_type) {
+                    case WeaponType_Sword: item.tile = Tiles.Sword;
+                    case WeaponType_Spear: item.tile = Tiles.Spear;
+                    case WeaponType_Bow: item.tile = Tiles.Bow;
+                    default: item.tile = Tiles.Wilhelm;
                 }
             }
             walls[item.x][item.y] = false;
@@ -411,9 +471,12 @@ class Game {
                         case CardType_Treasure: card_color = Col.YELLOW;
                         case CardType_None: card_color = Col.PINK;
                     }
-                    Gfx.fill_box(x * card_width * tilesize, y * card_height * tilesize,
-                        card_width * tilesize, card_height * tilesize, card_color, 0.8);
-                    // Gfx.draw_image(x * card_width * tilesize, y * card_height * tilesize, "card");
+                    if (DRAW_TRANSPARENT_COVER) {
+                        Gfx.fill_box(x * card_width * tilesize, y * card_height * tilesize,
+                            card_width * tilesize, card_height * tilesize, card_color, 0.8);
+                    } else if (DRAW_IMAGE_COVER) {
+                        Gfx.draw_image(x * card_width * tilesize, y * card_height * tilesize, "card");
+                    }
                 }
             }
         }
@@ -428,6 +491,7 @@ class Game {
 
         Text.display(inventory_x, 500, 'Health: ${player.hp}');
         Text.display(inventory_x, 540, 'Armor: ${player.armor}');
+        Text.display(inventory_x, 600, hover_info);
     }
 
     function out_of_bounds(x:Int, y:Int):Bool {
@@ -557,36 +621,6 @@ class Game {
             }
         }
 
-        // Enemy turn
-        if (state != GameState_PlayerTurn) {
-            for (dude in Entity.get(Dude)) {
-                if (dude.active && !dude.dead) {
-                    var dude_player_dx = player.x - dude.x;
-                    var dude_player_dy = player.y - dude.y;
-                    if (player.moved) {
-                        dude_player_dx += player.dx;
-                        dude_player_dy += player.dy;
-                    }
-                    // Attack if next to player
-                    if (Math.abs(dude_player_dx) + Math.abs(dude_player_dy) == 1) {
-                        dude.attacked = true;
-                        dude.dx = Math.sign(dude_player_dx);
-                        dude.dy = Math.sign(dude_player_dy);
-                    }
-
-                    // Chase player(updated position)
-                    if (!dude.attacked) {
-                        var path = a_star(dude.x, dude.y, player.x + player.dx, player.y + player.dy);
-                        if (path.length > 1) {
-                            dude.moved = true;
-                            dude.dx = path[path.length - 2].x - dude.x;
-                            dude.dy = path[path.length - 2].y - dude.y;
-                        }
-                    }
-                }
-            }
-        }
-
         // Drag
         if (state == GameState_PlayerTurn) {
             if (Mouse.left_click()) {
@@ -632,8 +666,6 @@ class Game {
         }
 
         render();
-
-        GUI.enum_setter(800, 100, function(x) { player.weapon = x; }, player.weapon, WeaponType);
     }
 
     function update_item_drag() {
@@ -641,34 +673,61 @@ class Game {
             var put_in_inventory = false;
             if (Mouse.x > inventory_x - 5) {
                 // Drop into inventory
+                var slot_index = 0;
                 for (i in 0...inventory_slots) {
-                    if (inventory[i] == null
-                        && Math.point_box_intersect(Mouse.x, Mouse.y, inventory_x, inventory_y + i * inventory_slot_size,
-                            inventory_slot_size, inventory_slot_size)) {
-                        var can_put_in_inventory = true;
-                        // Can equip only one type of armor
-                        if (dragged_item.type == ItemType_Armor) {
-                            for (i in 0...inventory_slots) {
-                                if (inventory[i] != null && inventory[i].armor_type == dragged_item.armor_type) {
-                                    can_put_in_inventory = false;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (can_put_in_inventory) {
-                            inventory[i] = dragged_item;
-                            put_in_inventory = true;
-                            dragged_item.x = -1;
-                            dragged_item.y = -1;
-
-                            // Equip item
-                            if (dragged_item.type == ItemType_Armor) {
-                                player.armor += dragged_item.value;
-                            }
-                        }
-
+                    if (Math.point_box_intersect(Mouse.x, Mouse.y, inventory_x, inventory_y + i * inventory_slot_size,
+                        inventory_slot_size, inventory_slot_size)) 
+                    {
+                        slot_index = i;
                         break;
+                    }
+                }
+                var can_put_in_inventory = true;
+
+                // Can equip only one type of armor or weapon
+                if (dragged_item.type == ItemType_Armor) {
+                    for (i in 0...inventory_slots) {
+                        if (i != slot_index 
+                            && inventory[i] != null 
+                            && inventory[i].type == ItemType_Armor 
+                            && inventory[i].armor_type == dragged_item.armor_type) 
+                        {
+                            can_put_in_inventory = false;
+                            break;
+                        }
+                    }
+                }
+                if (dragged_item.type == ItemType_Weapon) {
+                    for (i in 0...inventory_slots) {
+                        if (i != slot_index 
+                            && inventory[i] != null 
+                            && inventory[i].type == ItemType_Weapon 
+                            && inventory[i].weapon_type == dragged_item.weapon_type) 
+                        {
+                            can_put_in_inventory = false;
+                            break;
+                        }
+                    }
+                }     
+
+                if (can_put_in_inventory) {
+                    // Switch items if current slot isn't empty
+                    if (inventory[slot_index] != null) {
+                        inventory[slot_index].x = dragged_item.x;
+                        inventory[slot_index].y = dragged_item.y;
+                        inventory[slot_index].on_ground = true;
+                    }
+
+                    inventory[slot_index] = dragged_item;
+                    put_in_inventory = true;
+                    dragged_item.x = -1;
+                    dragged_item.y = -1;
+
+                    // Equip item
+                    if (dragged_item.type == ItemType_Armor) {
+                        player.armor += dragged_item.value;
+                    } else if (dragged_item.type == ItemType_Weapon) {
+                        player.weapon = dragged_item.weapon_type;
                     }
                 }
             }
@@ -693,6 +752,18 @@ class Game {
                         }
                     }
                 }
+            }
+
+            // check if no weapon is equipped
+            var no_weapon = true;
+            for (i in 0...inventory_slots) {
+                if (inventory[i] != null && inventory[i].type == ItemType_Weapon && inventory[i].weapon_type != WeaponType_None) {
+                    no_weapon = false;
+                    break;
+                }
+            }
+            if (no_weapon) {
+                player.weapon = WeaponType_None;
             }
 
             dragged_item = null;
@@ -781,8 +852,7 @@ class Game {
             player.real_x = player.x * tilesize;
             player.real_y = player.y * tilesize;
         } else if (player.attacked) {
-            // Remove hit dude
-            // TODO: add death visual
+            // decrease hp of hit dude, make him dead if hp = 0
             var hit_dude:Dude = null;
             var hit_cells: Array<IntVector2>;
             switch (player.weapon) {
@@ -816,8 +886,6 @@ class Game {
                 hit_dude.hp--;
                 if (hit_dude.hp <= 0) {
                     hit_dude.dead = true;
-                    hit_dude.moved = false;
-                    hit_dude.attacked = false;
                 }
             }
         }
@@ -825,6 +893,39 @@ class Game {
         player.attacked = false;
         player.dx = 0;
         player.dy = 0;
+
+        // Enemy turn
+        for (dude in Entity.get(Dude)) {
+            if (dude.active && !dude.dead) {
+                var dude_player_dx = player.x - dude.x;
+                var dude_player_dy = player.y - dude.y;
+                if (player.moved) {
+                    dude_player_dx += player.dx;
+                    dude_player_dy += player.dy;
+                }
+                // Attack if next to player
+                if (Math.abs(dude_player_dx) + Math.abs(dude_player_dy) == 1) {
+                    dude.attacked = true;
+                    dude.dx = Math.sign(dude_player_dx);
+                    dude.dy = Math.sign(dude_player_dy);
+                }
+
+                // Otherwise chase player(to the new position)
+                if (!dude.attacked) {
+                    var path = a_star(dude.x, dude.y, player.x, player.y);
+                    if (path.length > 1) {
+                        dude.moved = true;
+                        dude.dx = path[path.length - 2].x - dude.x;
+                        dude.dy = path[path.length - 2].y - dude.y;
+                    }
+                }
+            }
+        }
+
+        // Update dude hp in info
+        for (dude in Entity.get(Dude)) {
+            update_dude_info(dude);
+        }
 
         render();
 
@@ -947,7 +1048,7 @@ class Game {
                     card_update_timer = card_update_timer_max;
                     updated_card.type = random_enum(CardType, 1);
                     updated_card.covered = true;
-                    generate_card_front(updated_card);
+                    generate_card(updated_card);
                     cards_uncovered--;
                 }
             }
@@ -1004,6 +1105,28 @@ class Game {
             }
         }
 
+        // Item info on hover
+        // Enemies takes precedence over items
+        var hover_x = Std.int(Mouse.x / tilesize);
+        var hover_y = Std.int(Mouse.y / tilesize);
+        hover_info = "";
+        if (!out_of_bounds(hover_x, hover_y)) {
+            for (dude in Entity.get(Dude)) {
+                if (dude.active && hover_x == dude.x && hover_y == dude.y) {
+                    hover_info = dude.info;
+                    break;
+                }
+            }
+            if (hover_info == "") {
+                for (item in Entity.get(Item)) {
+                    if (item.on_ground && hover_x == item.x && hover_y == item.y) {
+                        hover_info = item.info;
+                        break;
+                    }
+                }
+            }
+        }
+
         switch (state) {
             case GameState_PlayerTurn: update_player_turn();
             case GameState_ItemDrag: update_item_drag();
@@ -1013,5 +1136,7 @@ class Game {
             case GameState_EnemyTurnResult: update_enemy_turn_result();
             case GameState_CardFlip: update_card_flip();
         }
+
+        // GUI.enum_setter(800, 100, function(x) { player.weapon = x; }, player.weapon, WeaponType);
     }
 }

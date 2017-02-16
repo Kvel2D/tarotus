@@ -78,6 +78,10 @@ class ApplicationMain {
 		types.push (lime.Assets.AssetType.BINARY);
 		
 		
+		urls.push ("data/graphics/16pal_v20.png");
+		types.push (lime.Assets.AssetType.IMAGE);
+		
+		
 		urls.push ("data/graphics/card.png");
 		types.push (lime.Assets.AssetType.IMAGE);
 		
@@ -155,7 +159,7 @@ class ApplicationMain {
 		
 		config = {
 			
-			build: "613",
+			build: "733",
 			company: "",
 			file: "game",
 			fps: 60,

@@ -6,6 +6,8 @@ class Tiles {
         return y * tileset_width + x;
     }
 
+    static inline var Wilhelm = tilenum(0, 1); // bugged tile
+
     static inline var Player = tilenum(0, 0);
     static inline var Wall = tilenum(1, 0);
     static inline var Space = tilenum(2, 0);
@@ -13,7 +15,9 @@ class Tiles {
     static inline var Box = tilenum(4, 0);
     static inline var Ball = tilenum(5, 0);
     static inline var Stick = tilenum(6, 0);
-    static inline var Armor = tilenum(7, 0);
+    static inline var Chest = tilenum(7, 0);
+    static inline var Head = tilenum(5, 1);
+    static inline var Legs = tilenum(6, 1);
     static inline var Potion = tilenum(8, 0);
     static inline var Sword = tilenum(9, 0);
     static inline var Spear = tilenum(9, 1);

@@ -1,17 +1,15 @@
-make weapons into items
-maybe move enemy logic outside of player_turn
+implement all control methods you can think of and test them
+make wall card presets
+attack by clicking
 make multi-turn weapons auto, can't cancel, next turn is performed automatically for you
 mock up specific cards
-i don't like how rendering is split between render() and all update_visual functions, maybe add a "don't render flag" instead of a myriad bool checks
 maybe less enemy cards
+add LOS to dudes
 
-
+try generating presets by generating a dungeon completely first and then breaking it down into elements
 
 DONE:
-split GUI.slider() into auto_slider() and slider()
-GUI.enum_setter()
-multiple weapon types
-death visual
+m
 
 
 CARD TYPES:

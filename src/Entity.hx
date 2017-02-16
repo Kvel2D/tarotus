@@ -1,10 +1,36 @@
 import haxe.ds.ObjectMap;
+import haxegon.*;
 
 enum DoorColor {
 	DoorColor_White;
 	DoorColor_Black;
 }
 
+enum ItemType {
+	ItemType_None;
+	ItemType_Armor;
+	ItemType_Consumable;
+	ItemType_Weapon;
+}
+
+enum ConsumableType {
+	ConsumableType_None;
+	ConsumableType_Potion;
+}
+
+enum ArmorType {
+	ArmorType_None;
+	ArmorType_Chest;
+	ArmorType_Legs;
+	ArmorType_Head;
+}
+
+enum WeaponType {
+	WeaponType_None;
+	WeaponType_Sword;
+	WeaponType_Spear;
+	WeaponType_Bow;
+}
 
 @:publicFields
 class Entity {
@@ -47,13 +73,6 @@ class Entity {
 	}
 }
 
-enum WeaponType {
-	WeaponType_None;
-	WeaponType_Sword;
-	WeaponType_Spear;
-	WeaponType_Bow;
-}
-
 class Player extends Entity {
 	var x = 0;
 	var y = 0;
@@ -85,35 +104,22 @@ class Dude extends Entity {
 	static var classs = Dude;
 	var hp = 1;
 	var hp_max = 1;
-}
-
-enum ItemType {
-	ItemType_None;
-	ItemType_Armor;
-	ItemType_Consumable;
-}
-
-enum ConsumableType {
-	ConsumableType_None;
-	ConsumableType_Potion;
-}
-
-enum ArmorType {
-	ArmorType_None;
-	ArmorType_Chest;
-	ArmorType_Legs;
-	ArmorType_Head;
+	static var names = ["Dave", "Stephen", "Max", "Vinny"];
+	var name = names[Random.int(0, names.length - 1)];
+	var info = "";
 }
 
 class Item extends Entity {
 	var x = 0;
 	var y = 0;
 	var name = "";
+	var info = "Hello!\nItem info here";
 	var tile = 0;
 	var on_ground = true;
 
 	var type = ItemType_None;
 	var armor_type = ArmorType_None;
+	var weapon_type = WeaponType_None;
 	var consumable_type = ConsumableType_None;
 	var value = 0;
 }
