@@ -11,6 +11,7 @@ enum ItemType {
 	ItemType_Armor;
 	ItemType_Consumable;
 	ItemType_Weapon;
+	ItemType_Arrows;
 }
 
 enum ConsumableType {
@@ -122,4 +123,5 @@ class Item extends Entity {
 	var weapon_type = WeaponType_None;
 	var consumable_type = ConsumableType_None;
 	var value = 0;
+	var amount = 1;
 }

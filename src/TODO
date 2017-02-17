@@ -1,36 +1,51 @@
-implement all control methods you can think of and test them
-make wall card presets
-attack by clicking
-make multi-turn weapons auto, can't cancel, next turn is performed automatically for you
+"no arrows" tooltip
 mock up specific cards
 maybe less enemy cards
 add LOS to dudes
 
-try generating presets by generating a dungeon completely first and then breaking it down into elements
 
 DONE:
-m
+rework weapon visual
+stop weapon visual and effect at walls
+make bow range infinite
+first attempt at clearing paths to unreachable cells(doesn't always work)
+arrows
+add hover info for dragged items and inventory items
+fix incorrect a_star() ignore_covered_cards setting
+arrow mechanic
+
+---------------------------------------------------------------------------------------------------
+MILESTONES
+---------------------------------------------------------------------------------------------------
+combat system
+multiple enemy types
+loot system
+card refreshing
+difficulty progression
 
 
-CARD TYPES:
+---------------------------------------------------------------------------------------------------
+IDEAS
+---------------------------------------------------------------------------------------------------
+20 arcana bosses might be too much, maybe make arcanas into spells/abilities and make kings/queens bosses
+add attack controls for mouse too(going full WASD + mouse might be better)
+dudes that just block the way and don't attack(but do move)
+generate presets by generating a dungeon completely first and then breaking it down into elements
+
+powerful weapons take an extra turn to use
+
+magic
+
+fix unreachable cells, a better way might be to do a pass after all cards are generated and then do a full pass everytime a new card is generated
+
+---------------------------------------------------------------------------------------------------
+NOTES
+---------------------------------------------------------------------------------------------------
+
+CARD TYPES
 nothing card spawns some walls
 dude card spawns some dudes then walls
 treasure card spawns treasure then walls
-
-
-there should be upper and lower limit for number of covered cards
-something like: min of 30%, max of 70%
-min is more important than max
-so as player uncovers cards, each card has a timer
-when player uncovers too many cards, cards are replaced earlier
-when player uncovers cards too slowly, cards are gradually replaced
-
-remove only cards that are completed and empty, prioritizing older cards, where age is tracked from the moment card is flipped
-completed means:
-treasure cards: opened chest(not picking up item is okay)
-enemy: if enemy is moving, then doesn't matter, if enemy is static, then when all enemies belonging to card are dead
-empty means:
-no enemies or player, item is ok
 
 
 USING ITEMS
@@ -42,7 +57,19 @@ universal button for potions - there are other items
 what about items that don't affect the player directly(bomb) - drag onto player doesn't make sense then
 
 
-IDEAS:
-20 arcana bosses might be too much, maybe make arcanas into spells/abilities and make kings/queens bosses
-add attack controls for mouse too(going full WASD + mouse might be better)
-dudes that just block the way and don't attack(but do move)
+AMOUNT OF COVERED CARDS
+there should be upper and lower limit for number of covered cards
+something like: min of 30%, max of 70%
+min is more important than max
+so as player uncovers cards, each card has a timer
+when player uncovers too many cards, cards are replaced earlier
+when player uncovers cards too slowly, cards are gradually replaced
+
+
+CARD REMOVAL
+remove only cards that are completed and empty, prioritizing older cards, where age is tracked from the moment card is flipped
+completed means:
+treasure cards: opened chest(not picking up item is okay)
+enemy: if enemy is moving, then doesn't matter, if enemy is static, then when all enemies belonging to card are dead
+empty means:
+no enemies or player, item is ok

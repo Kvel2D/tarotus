@@ -38,7 +38,8 @@ class Game {
     static inline var DRAW_COORDINATES = false;
     static inline var UPDATE_CARDS = true;
     static inline var DRAW_IMAGE_COVER = false;
-    static inline var DRAW_TRANSPARENT_COVER = false;
+    static inline var DRAW_TRANSPARENT_COVER = true;
+    static inline var REQUIRE_ARROWS = false;
     static inline var tilesize = 64;
     static inline var cardmap_width = 5;
     static inline var cardmap_height = 3;
@@ -53,8 +54,9 @@ class Game {
 
     var state = GameState_PlayerTurn;
     var state_timer = 0; // reset to 0 by state at completion
-    static inline var visual_timer_max = 7;
+    static inline var move_visual_timer_max = 7;
     static inline var weapon_visual_timer_max = 10;
+    static inline var bow_visual_timer_max = 50;
     static inline var card_flip_timer_max = 30;
     var flipped_card = {x: 0, y: 0};
     var drag_dx = 0;
@@ -128,15 +130,16 @@ class Game {
         cards_uncovered = 1;
         cards[0][0].type = CardType_None;
 
+        player = new Player();
+        player.x = 2;
+        player.y = 1;
+
         for (x in 0...cardmap_width) {
             for (y in 0...cardmap_height) {
                 generate_card(cards[x][y]);
             }
         }
 
-        player = new Player();
-        player.x = 2;
-        player.y = 1;
         walls[player.x][player.y] = false;
         player.real_x = player.x * tilesize;
         player.real_y = player.y * tilesize;
@@ -208,7 +211,7 @@ class Game {
             }
         }
 
-        function random_free_cell(card_x: Int, card_y: Int): IntVector2 {
+        function random_cell_in_card(card_x: Int, card_y: Int, is_good: Int->Int->Bool): IntVector2 {
             var out: IntVector2 = {x: 0, y: 0};
             var x_start = card.x * card_width;
             var x_end = x_start + card_width;
@@ -218,7 +221,7 @@ class Game {
             var free_cell_amount = 0;
             for (x in x_start...x_end) {
                 for (y in y_start...y_end) {
-                    if (!walls[x][y]) {
+                    if (is_good(x, y)) {
                         free_cell_amount++;
                     }
                 }
@@ -228,7 +231,7 @@ class Game {
             var i = 0;
             for (x in x_start...x_end) {
                 for (y in y_start...y_end) {
-                    if (!walls[x][y]) {
+                    if (is_good(x, y)) {
                         if (i == k) {
                             out.x = x;
                             out.y = y;
@@ -242,10 +245,42 @@ class Game {
             return out;
         }
 
+
+        // TODO: current generation can still produce unreachable cells
+        // Check for paths here and delete walls randomly until there's a path
+        // from player to every free cell on card
+        var path_exists = false;
+        while (!path_exists) {
+            path_exists = true;
+
+            for (i in 0...card_width) {
+                if (!path_exists) {
+                    break;
+                }
+                for (j in 0...card_height) {
+                    var x = card.x * card_width + i;
+                    var y = card.y * card_height + j;
+                    if (!walls[x][y]) {
+                        var path = a_star(player.x, player.y, x, y, true);
+                        if (path.length == 0) {
+                            path_exists = false;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!path_exists) {
+                var random_wall = random_cell_in_card(card.x, card.y, function(x, y) { return walls[x][y]; });
+                walls[random_wall.x][random_wall.y] = false;
+            }
+        }
+
+
         if (card.type == CardType_Dude) {
             // Spawn dude
             var dude = new Dude();
-            var free_cell = random_free_cell(card.x, card.y);
+            var free_cell = random_cell_in_card(card.x, card.y, function(x, y) { return !walls[x][y]; });
             dude.x = free_cell.x;
             dude.y = free_cell.y;
             dude.real_x = dude.x * tilesize;
@@ -255,7 +290,7 @@ class Game {
         } else if (card.type == CardType_Treasure) {
             // Spawn random item
             var item = new Item();
-            var free_cell = random_free_cell(card.x, card.y);
+            var free_cell = random_cell_in_card(card.x, card.y, function(x, y) { return !walls[x][y]; });
             item.x = free_cell.x;
             item.y = free_cell.y;
             item.type = random_enum(ItemType, 1);
@@ -266,9 +301,11 @@ class Game {
                 item.consumable_type = random_enum(ConsumableType);
                 item.value = 2;
                 item.tile = Tiles.Potion;
+                item.name = "Potion";
             } else if (item.type == ItemType_Armor) {
                 item.armor_type = random_enum(ArmorType, 1);
                 item.value = 5;
+                item.name = "Armor";
                 switch (item.armor_type) {
                     case ArmorType_Chest: item.tile = Tiles.Chest;
                     case ArmorType_Head: item.tile = Tiles.Head;
@@ -277,18 +314,23 @@ class Game {
                 }
             } else if (item.type == ItemType_Weapon) {
                 item.weapon_type = random_enum(WeaponType, 1);
+                item.name = "Weapon";
                 switch (item.weapon_type) {
                     case WeaponType_Sword: item.tile = Tiles.Sword;
                     case WeaponType_Spear: item.tile = Tiles.Spear;
                     case WeaponType_Bow: item.tile = Tiles.Bow;
                     default: item.tile = Tiles.Wilhelm;
                 }
+            } else if (item.type == ItemType_Arrows) {
+                item.amount = Random.int(7, 11);
+                item.tile = Tiles.Arrows;
+                item.name = "Arrows";
             }
             walls[item.x][item.y] = false;
         }
     }
 
-    function a_star(x1:Int, y1:Int, x2:Int, y2:Int):Array<IntVector2> {
+    function a_star(x1:Int, y1:Int, x2:Int, y2:Int, ignore_covered_cards = false):Array<IntVector2> {
         function heuristic_score(x1:Int, y1:Int, x2:Int, y2:Int):Int {
             return Std.int(Math.abs(x2 - x1) + Math.abs(y2 - y1));
         }
@@ -318,12 +360,14 @@ class Game {
                 }
             }
         }
-        for (x in 0...cardmap_width) {
-            for (y in 0...cardmap_height) {
-                if (cards[x][y].covered) {
-                    for (x2 in 0...card_width) {
-                        for (y2 in 0...card_height) {
-                            move_map[x * card_width + x2][y * card_height + y2] = false;
+        if (!ignore_covered_cards) {
+            for (x in 0...cardmap_width) {
+                for (y in 0...cardmap_height) {
+                    if (cards[x][y].covered) {
+                        for (x2 in 0...card_width) {
+                            for (y2 in 0...card_height) {
+                                move_map[x * card_width + x2][y * card_height + y2] = false;
+                            }
                         }
                     }
                 }
@@ -411,6 +455,14 @@ class Game {
     }
 
     function render() {
+        function draw_item(x: Float, y: Float, item: Item) {
+            Gfx.draw_tile(x, y, item.tile);
+            Text.display(x, y, item.name);
+            if (item.type == ItemType_Arrows) {
+                Text.display(x + tilesize / 10, y + tilesize / 2, '${item.amount}');
+            }
+        }
+
         for (x in 0...map_width) {
             for (y in 0...map_height) {
                 if (walls[x][y]) {
@@ -440,15 +492,13 @@ class Game {
 
         for (item in Entity.get(Item)) {
             if (item.on_ground) {
-                Gfx.draw_tile(item.x * tilesize, item.y * tilesize, item.tile);
-                Text.display(item.x * tilesize, item.y * tilesize, item.name);
+                draw_item(item.x * tilesize, item.y * tilesize, item);
             }
         }
         for (i in 0...inventory_slots) {
             Gfx.draw_box(inventory_x, inventory_y + i * inventory_slot_size, inventory_slot_size, inventory_slot_size, Col.WHITE);
             if (inventory[i] != null) {
-                Gfx.draw_tile(inventory_x, inventory_y + i * inventory_slot_size, inventory[i].tile);
-                Text.display(inventory_x, inventory_y + i * inventory_slot_size, inventory[i].name);
+                draw_item(inventory_x, inventory_y + i * inventory_slot_size, inventory[i]);
             }
         }
 
@@ -473,7 +523,7 @@ class Game {
                     }
                     if (DRAW_TRANSPARENT_COVER) {
                         Gfx.fill_box(x * card_width * tilesize, y * card_height * tilesize,
-                            card_width * tilesize, card_height * tilesize, card_color, 0.8);
+                            card_width * tilesize, card_height * tilesize, card_color, 0.2);
                     } else if (DRAW_IMAGE_COVER) {
                         Gfx.draw_image(x * card_width * tilesize, y * card_height * tilesize, "card");
                     }
@@ -482,8 +532,7 @@ class Game {
         }
 
         if (dragged_item != null) {
-            Gfx.draw_tile(Mouse.x - drag_dx, Mouse.y - drag_dy, dragged_item.tile);
-            Text.display(Mouse.x - drag_dx, Mouse.y - drag_dy, dragged_item.name);
+            draw_item(Mouse.x - drag_dx, Mouse.y - drag_dy, dragged_item);
         }
 
         Text.display(inventory_x, 0, '${Gfx.render_fps()}');
@@ -528,16 +577,16 @@ class Game {
         //
         player.dx = 0;
         player.dy = 0;
-        if (Input.pressed(Key.LEFT)) {
+        if (Input.pressed(Key.A)) {
             player.dx--;
         }
-        if (Input.pressed(Key.RIGHT)) {
+        if (Input.pressed(Key.D)) {
             player.dx++;
         }
-        if (Input.pressed(Key.UP)) {
+        if (Input.pressed(Key.W)) {
             player.dy--;
         }
-        if (Input.pressed(Key.DOWN)) {
+        if (Input.pressed(Key.S)) {
             player.dy++;
         }
         // No diagonal movement
@@ -595,17 +644,33 @@ class Game {
         if (!player.moved) {
             player.dx = 0;
             player.dy = 0;
-            if (Input.pressed(Key.A)) {
-                player.dx--;
+
+            // Attack by clicking
+            if (Mouse.right_click()) {
+                var dx = Mouse.x - player.x * tilesize - tilesize / 2;
+                var dy = Mouse.y - player.y * tilesize - tilesize / 2;
+                if (Math.abs(dx) >= Math.abs(dy)) {
+                    player.dx = Math.sign(dx);
+                } else {
+                    player.dy = Math.sign(dy);
+                }
             }
-            if (Input.pressed(Key.D)) {
-                player.dx++;
-            }
-            if (Input.pressed(Key.W)) {
-                player.dy--;
-            }
-            if (Input.pressed(Key.S)) {
-                player.dy++;
+
+            if (player.dx == 0 && player.dy == 0) {
+
+                // Attack with arrow keys
+                if (Input.pressed(Key.LEFT)) {
+                    player.dx--;
+                }
+                if (Input.pressed(Key.RIGHT)) {
+                    player.dx++;
+                }
+                if (Input.pressed(Key.UP)) {
+                    player.dy--;
+                }
+                if (Input.pressed(Key.DOWN)) {
+                    player.dy++;
+                }
             }
 
             // No diagonal attack
@@ -614,10 +679,30 @@ class Game {
                 player.dy = 0;
             }
 
-            if (player.dx != 0 || player.dy != 0) { // attack even if no dude was hit
-                state = GameState_PlayerVisual;
-                player.attacked = true;
-                player.moved = false;
+            if (player.dx != 0 || player.dy != 0) {
+                var can_attack = true;
+                if (player.weapon == WeaponType_Bow && REQUIRE_ARROWS) {
+                    var have_arrows = false;
+                    for (i in 0...inventory.length) {
+                        if (inventory[i] != null && inventory[i].type == ItemType_Arrows) {
+                            have_arrows = true;
+                            inventory[i].amount--;
+                            if (inventory[i].amount == 0) {
+                                inventory[i] = null;
+                            }
+                            break;
+                        }
+                    }
+                    if (!have_arrows) {
+                        can_attack = false;
+                    }
+                }
+
+                if (can_attack) {
+                    state = GameState_PlayerVisual;
+                    player.attacked = true;
+                    player.moved = false;
+                }
             }
         }
 
@@ -775,8 +860,8 @@ class Game {
 
     function update_player_visual() {
         if (player.moved) {
-            player.real_x = Std.int(player.x * tilesize + player.dx * tilesize * (state_timer / visual_timer_max));
-            player.real_y = Std.int(player.y * tilesize + player.dy * tilesize * (state_timer / visual_timer_max));
+            player.real_x = Std.int(player.x * tilesize + player.dx * tilesize * (state_timer / move_visual_timer_max));
+            player.real_y = Std.int(player.y * tilesize + player.dy * tilesize * (state_timer / move_visual_timer_max));
         }
 
         render();
@@ -793,51 +878,90 @@ class Game {
             angle = 270;
         }
         if (player.attacked) {
+            var attack_dst = 0;
+            var timer_max = 0;
+
             switch (player.weapon) {
                 case WeaponType_None: {
-                    var attack_progress = 1 - Math.abs(state_timer / weapon_visual_timer_max - 0.5);
-                    var attack_dst = 50;
-                    Gfx.fill_circle((player.x + 0.5) * tilesize + player.dx * attack_progress * attack_dst,
-                        (player.y + 0.5) * tilesize + player.dy * attack_progress * attack_dst, 10, Col.RED);
+                    timer_max = weapon_visual_timer_max;
+                    attack_dst = tilesize;
                 }
                 case WeaponType_Sword: {
-                    var attack_progress = 1 - Math.abs(state_timer / weapon_visual_timer_max - 0.5);
-                    var attack_dst = 50;
+                    timer_max = weapon_visual_timer_max;
+                    attack_dst = tilesize;
+                }
+                case WeaponType_Spear: {
+                    timer_max = weapon_visual_timer_max;
+                    attack_dst = Std.int(2.5 * tilesize);
+                }
+                case WeaponType_Bow: {
+                    timer_max = bow_visual_timer_max;
+                    attack_dst = Std.int(Math.max(map_width, map_height)) * tilesize;
+                }
+            }
+
+            var attack_progress = 0.5 - Math.abs(state_timer / timer_max - 0.5);
+            var visual_x = (player.x + 0.5) * tilesize + player.dx * attack_progress * attack_dst + player.dx * tilesize / 2;
+            var visual_y = (player.y + 0.5) * tilesize + player.dy * attack_progress * attack_dst + player.dy * tilesize / 2;
+            var visual_cell_x = Std.int(visual_x / tilesize);
+            var visual_cell_y = Std.int(visual_y / tilesize);
+            var visual_card_x = Std.int(visual_cell_x / card_width);
+            var visual_card_y = Std.int(visual_cell_y / card_height);
+
+            switch (player.weapon) {
+                case WeaponType_None: {
+                    Gfx.fill_circle(visual_x, visual_y, 10, Col.RED);
+                }
+                case WeaponType_Sword: {
                     var tri = [0, tilesize / 4, 0, -tilesize / 4, tilesize / 4, 0];
                     Math.rotate_vertices(tri, 0, 0, angle);
-                    Math.translate_vertices(tri, 
-                        (player.x + 0.5) * tilesize + player.dx * attack_progress * attack_dst,
-                        (player.y + 0.5) * tilesize + player.dy * attack_progress * attack_dst);
+                    Math.translate_vertices(tri, visual_x, visual_y);
                     Gfx.fill_tri_array(tri, Col.RED);
                 }
                 case WeaponType_Spear: {
-                    var attack_progress = 1 - Math.abs(state_timer / weapon_visual_timer_max - 0.5);
-                    var attack_dst = 100;
                     var tri = [0, tilesize / 8, 0, -tilesize / 8, tilesize / 3, 0];
                     Math.rotate_vertices(tri, 0, 0, angle);
-                    Math.translate_vertices(tri, 
-                        (player.x + 0.5) * tilesize + player.dx * attack_progress * attack_dst,
-                        (player.y + 0.5) * tilesize + player.dy * attack_progress * attack_dst);
+                    Math.translate_vertices(tri, visual_x, visual_y);
                     Gfx.fill_tri_array(tri, Col.RED);
+
+                    // Stop at wall
+                    if (out_of_bounds(visual_cell_x, visual_cell_y) 
+                        || walls[visual_cell_x][visual_cell_y]
+                        || cards[visual_card_x][visual_card_y].covered) 
+                    {
+                        state_timer = 1000000;
+                    }
                 }
                 case WeaponType_Bow: {
-                    var attack_progress = 1 - Math.abs(state_timer / weapon_visual_timer_max - 0.5);
-                    var attack_dst = 200;
                     var tri = [0, tilesize / 16, 0, -tilesize / 16, tilesize / 4, 0];
                     Math.rotate_vertices(tri, 0, 0, angle);
                     Math.translate_vertices(tri, 
                         (player.x + 0.5) * tilesize + player.dx * attack_progress * attack_dst,
                         (player.y + 0.5) * tilesize + player.dy * attack_progress * attack_dst);
                     Gfx.fill_tri_array(tri, Col.RED);
+
+                    // Stop at wall
+                    if (out_of_bounds(visual_cell_x, visual_cell_y) 
+                        || walls[visual_cell_x][visual_cell_y]
+                        || cards[visual_card_x][visual_card_y].covered) 
+                    {
+                        state_timer = 1000000;
+                    }
                 }
             }
         }
 
 
         state_timer++;
-        var max = visual_timer_max;
-        if (player.attacked) {
-            max = weapon_visual_timer_max;
+        var max = 0;
+        if (player.moved) {
+            max = move_visual_timer_max;
+        } else if (player.attacked) {
+            if (player.weapon == WeaponType_Bow) {
+                max = bow_visual_timer_max;
+            } else {
+                max = weapon_visual_timer_max;
+            }
         }
         if (state_timer > max) {
             state = GameState_PlayerTurnResult;
@@ -855,19 +979,26 @@ class Game {
             // decrease hp of hit dude, make him dead if hp = 0
             var hit_dude:Dude = null;
             var hit_cells: Array<IntVector2>;
+            var attack_distance = 0;
             switch (player.weapon) {
-                case WeaponType_None: {
-                    hit_cells = [{x: player.x + player.dx, y: player.y + player.dy}];
+                case WeaponType_None: attack_distance = 1;
+                case WeaponType_Sword: attack_distance = 1;
+                case WeaponType_Spear: attack_distance = 2;
+                case WeaponType_Bow: attack_distance = Std.int(Math.max(map_width, map_height));
+            }
+            var hit_cells = new Array<IntVector2>();
+            var i = 0;
+            var hit_x = 0;
+            var hit_y = 0;
+            while (i <= attack_distance) {
+                hit_x = player.x + i * player.dx;
+                hit_y = player.y + i * player.dy;
+                if (out_of_bounds(hit_x, hit_y) || walls[hit_x][hit_y]) {
+                    break;
+                } else {
+                    hit_cells.push({x: hit_x, y: hit_y});
                 }
-                case WeaponType_Sword: {
-                    hit_cells = [{x: player.x + player.dx, y: player.y + player.dy}];
-                }
-                case WeaponType_Spear: {
-                    hit_cells = [for (i in 1...3) {x: player.x + i * player.dx, y: player.y + i * player.dy}];
-                }
-                case WeaponType_Bow: {
-                    hit_cells = [for (i in 1...5) {x: player.x + i * player.dx, y: player.y + i * player.dy}];
-                }
+                i++;
             }
             for (dude in Entity.get(Dude)) {
                 if (dude.active) {
@@ -933,10 +1064,15 @@ class Game {
     }
 
     function update_enemy_visual() {
+        var all_visuals_completed = true;
+
         for (dude in Entity.get(Dude)) {
             if (dude.moved) {
-                dude.real_x = Std.int(dude.x * tilesize + dude.dx * tilesize * (state_timer / visual_timer_max));
-                dude.real_y = Std.int(dude.y * tilesize + dude.dy * tilesize * (state_timer / visual_timer_max));
+                dude.real_x = Std.int(dude.x * tilesize + dude.dx * tilesize * (state_timer / move_visual_timer_max));
+                dude.real_y = Std.int(dude.y * tilesize + dude.dy * tilesize * (state_timer / move_visual_timer_max));
+                if (state_timer < move_visual_timer_max) {
+                    all_visuals_completed = false;
+                }
             }
         }
 
@@ -944,20 +1080,26 @@ class Game {
 
         for (dude in Entity.get(Dude)) {
             if (dude.dead) {
-                Gfx.rotation(20 * state_timer / visual_timer_max);
+                Gfx.rotation(20 * state_timer / move_visual_timer_max);
                 Gfx.draw_tile(dude.real_x, dude.real_y, Tiles.Dude);
                 Gfx.rotation(0);
+                if (state_timer < move_visual_timer_max) {
+                    all_visuals_completed = false;
+                }
             } else if (dude.attacked) {
-                var attack_progress = 1 - Math.abs(state_timer / visual_timer_max - 0.5);
+                var attack_progress = 1 - Math.abs(state_timer / weapon_visual_timer_max - 0.5);
                 var attack_dst = 50;
                 Gfx.fill_circle((dude.x + 0.5) * tilesize + dude.dx * attack_progress * attack_dst,
                     (dude.y + 0.5) * tilesize + dude.dy * attack_progress * attack_dst, 10, Col.BLUE);
+                if (state_timer < weapon_visual_timer_max) {
+                    all_visuals_completed = false;
+                }
             }
         }
 
 
         state_timer++;
-        if (state_timer > visual_timer_max) {
+        if (all_visuals_completed) {
             state = GameState_EnemyTurnResult;
             state_timer = 0;
         }
@@ -1110,7 +1252,11 @@ class Game {
         var hover_x = Std.int(Mouse.x / tilesize);
         var hover_y = Std.int(Mouse.y / tilesize);
         hover_info = "";
-        if (!out_of_bounds(hover_x, hover_y)) {
+        if (dragged_item != null) {
+            // Dragged item always shows info
+            hover_info = dragged_item.info;
+        } else if (!out_of_bounds(hover_x, hover_y)) {
+            // Ground items and enemies
             for (dude in Entity.get(Dude)) {
                 if (dude.active && hover_x == dude.x && hover_y == dude.y) {
                     hover_info = dude.info;
@@ -1125,6 +1271,17 @@ class Game {
                     }
                 }
             }
+        } else {
+            // Inventory items
+            for (i in 0...inventory_slots) {
+                if (inventory[i] != null
+                    && Math.point_box_intersect(Mouse.x, Mouse.y, inventory_x, inventory_y + i * inventory_slot_size,
+                        inventory_slot_size, inventory_slot_size)) 
+                {
+                    hover_info = inventory[i].info;
+                    break;
+                }
+            }
         }
 
         switch (state) {
@@ -1137,6 +1294,6 @@ class Game {
             case GameState_CardFlip: update_card_flip();
         }
 
-        // GUI.enum_setter(800, 100, function(x) { player.weapon = x; }, player.weapon, WeaponType);
+        GUI.enum_setter(800, 100, function(x) { player.weapon = x; }, player.weapon, WeaponType);
     }
 }
