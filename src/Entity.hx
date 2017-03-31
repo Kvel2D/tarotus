@@ -99,6 +99,7 @@ class Dude extends Entity {
 	var active = false;
 	var attacked = false;
 	var moved = false;
+	var following_player = false;
 	var dx = 0;
 	var dy = 0;
 	var dead = false;
@@ -108,6 +109,7 @@ class Dude extends Entity {
 	static var names = ["Dave", "Stephen", "Max", "Vinny"];
 	var name = names[Random.int(0, names.length - 1)];
 	var info = "";
+	var points = new Array<IntVector2>(); // for debug
 }
 
 class Item extends Entity {

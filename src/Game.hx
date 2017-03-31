@@ -40,6 +40,7 @@ class Game {
     static inline var DRAW_IMAGE_COVER = false;
     static inline var DRAW_TRANSPARENT_COVER = true;
     static inline var REQUIRE_ARROWS = false;
+    static inline var DRAW_LOS_DEBUG = false;
     static inline var tilesize = 64;
     static inline var cardmap_width = 5;
     static inline var cardmap_height = 3;
@@ -63,6 +64,9 @@ class Game {
     var drag_dy = 0;
     var dragged_item:Item = null;
     var hover_info = "";
+    var message_text = "";
+    var message_time_left = 0;
+    static var message_fade_length = 180;
 
     var walls = Data.bool_2dvector(map_width, map_height);
     var cards = new Vector<Vector<Card>>(cardmap_width);
@@ -143,6 +147,11 @@ class Game {
         walls[player.x][player.y] = false;
         player.real_x = player.x * tilesize;
         player.real_y = player.y * tilesize;
+    }
+
+    function make_message(text: String) {
+        message_text = text;
+        message_time_left = message_fade_length * 2;
     }
 
     function update_dude_info(dude: Dude) {
@@ -541,6 +550,30 @@ class Game {
         Text.display(inventory_x, 500, 'Health: ${player.hp}');
         Text.display(inventory_x, 540, 'Armor: ${player.armor}');
         Text.display(inventory_x, 600, hover_info);
+
+        var message_x = inventory_x;
+        var message_y = 700;
+        if (message_time_left > 0) {
+            if (Math.point_box_intersect(Mouse.x, Mouse.y, message_x, message_y, Text.width(message_text), Text.height())) {
+                message_time_left = Std.int(message_fade_length * 1.5);
+            }
+            message_time_left--;
+            if (message_time_left > message_fade_length) {
+                Text.display(message_x, message_y, message_text);
+            } else {
+                var c = Std.int(message_time_left / message_fade_length * 255);
+                Text.display(message_x, message_y, message_text, Col.rgb(c, c, c));
+            }
+        }
+
+        if (DRAW_LOS_DEBUG) {
+            for (dude in Entity.get(Dude)) {
+                for (i in 0...dude.points.length) {
+                    var point = dude.points[i];
+                    Gfx.fill_circle(point.x * tilesize + tilesize / 2, point.y * tilesize + tilesize / 2, 10, Col.GREEN);
+                }
+            }
+        }
     }
 
     function out_of_bounds(x:Int, y:Int):Bool {
@@ -695,6 +728,7 @@ class Game {
                     }
                     if (!have_arrows) {
                         can_attack = false;
+                        make_message("No arrows in inventory");
                     }
                 }
 
@@ -1028,26 +1062,64 @@ class Game {
         // Enemy turn
         for (dude in Entity.get(Dude)) {
             if (dude.active && !dude.dead) {
-                var dude_player_dx = player.x - dude.x;
-                var dude_player_dy = player.y - dude.y;
-                if (player.moved) {
-                    dude_player_dx += player.dx;
-                    dude_player_dy += player.dy;
-                }
-                // Attack if next to player
-                if (Math.abs(dude_player_dx) + Math.abs(dude_player_dy) == 1) {
-                    dude.attacked = true;
-                    dude.dx = Math.sign(dude_player_dx);
-                    dude.dy = Math.sign(dude_player_dy);
+
+                // Check if dude can see player
+                if (!dude.following_player) {
+                    var can_see_player = true;
+                    dude.points = new Array<IntVector2>();
+                    // Check points on a line between dude and player
+                    var x0 = dude.x;
+                    var y0 = dude.y;
+                    var x1 = player.x;
+                    var y1 = player.y;
+                    var dx = (x1 - x0) / 50.0;
+                    var dy = (y1 - y0) / 50.0;
+                    var x = x0;
+                    var y = y0;
+                    var prev_x = x;
+                    var prev_y = y;
+                    for (t in 0...50) {
+                        x = Std.int(x0 + dx * t);
+                        y = Std.int(y0 + dy * t);
+                        if (x != prev_x || y != prev_y) {
+                            dude.points.push({x: x, y: y});
+                            if (walls[x][y]) {
+                                can_see_player = false;
+                            }
+                            prev_x = x;
+                            prev_y = y;
+                        }
+                    }
+
+                    if (can_see_player) {
+                        dude.following_player = true;
+                    }
                 }
 
-                // Otherwise chase player(to the new position)
-                if (!dude.attacked) {
-                    var path = a_star(dude.x, dude.y, player.x, player.y);
-                    if (path.length > 1) {
-                        dude.moved = true;
-                        dude.dx = path[path.length - 2].x - dude.x;
-                        dude.dy = path[path.length - 2].y - dude.y;
+
+                // Dude has seen the player and is following him
+                if (dude.following_player) {
+                    var dude_player_dx = player.x - dude.x;
+                    var dude_player_dy = player.y - dude.y;
+                    if (player.moved) {
+                        dude_player_dx += player.dx;
+                        dude_player_dy += player.dy;
+                    }
+                    // Attack if next to player
+                    if (Math.abs(dude_player_dx) + Math.abs(dude_player_dy) == 1) {
+                        dude.attacked = true;
+                        dude.dx = Math.sign(dude_player_dx);
+                        dude.dy = Math.sign(dude_player_dy);
+                    }
+
+                    // Otherwise chase player(to the new position)
+                    if (!dude.attacked) {
+                        var path = a_star(dude.x, dude.y, player.x, player.y);
+                        if (path.length > 1) {
+                            dude.moved = true;
+                            dude.dx = path[path.length - 2].x - dude.x;
+                            dude.dy = path[path.length - 2].y - dude.y;
+                        }
                     }
                 }
             }
@@ -1294,6 +1366,6 @@ class Game {
             case GameState_CardFlip: update_card_flip();
         }
 
-        GUI.enum_setter(800, 100, function(x) { player.weapon = x; }, player.weapon, WeaponType);
+        GUI.enum_setter(1000, 600, function(x) { player.weapon = x; }, player.weapon, WeaponType);
     }
 }
