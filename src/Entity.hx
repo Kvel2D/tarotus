@@ -80,6 +80,8 @@ class Player extends Entity {
 	var real_x = 0;
 	var real_y = 0;
 	var attacked = false;
+	var hit = false;
+	var angle = 0.0;
 	var moved = false;
 	var dx = 0;
 	var dy = 0;
@@ -115,7 +117,7 @@ class Dude extends Entity {
 class Item extends Entity {
 	var x = 0;
 	var y = 0;
-	var name = "";
+	var name = "name";
 	var info = "Hello!\nItem info here";
 	var tile = 0;
 	var on_ground = true;
@@ -125,5 +127,6 @@ class Item extends Entity {
 	var weapon_type = WeaponType_None;
 	var consumable_type = ConsumableType_None;
 	var value = 0; // used for armor amount, weapon damage, consumable effect interchangibly
+	var value_max = 0;
 	var amount = 1;
 }

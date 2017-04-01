@@ -1,31 +1,37 @@
 
-no arrows and wearing a bow, default to fist attack?
 proper card images
 start making items
-make a system that controls spawn rates and item progression
-make the fact of being damaged more obvious
+limit number of each type of card
+do make an experience system, levels raise your max health/mana, stats, stats are needed for weapons
+make bow consume arrow stack with least amount
+limit potion effect top max hp
+simply drop/equip: right click for instant equip/switch or drop from inventory to nearest cell
+weapons do need to break(breaking halves damage)
+more error messages(for weapon equipping for example)
 
 
 DONE:
-fix weapons
-rewrite drag system
-armor mechanic
-generated card types now have different chances
-armor break mechanic
+player getting hit visual
+fix consumable usage
+more item/dude info
+default to fist attack when there are no arrows for bow attack
 
 ---------------------------------------------------------------------------------------------------
 MILESTONES
 ---------------------------------------------------------------------------------------------------
-combat system
-loot system
 multiple enemy types
-card refreshing
-difficulty progression
+card magic
+*combat system
+*loot system
+*card refreshing
+*difficulty progression
 
 
 ---------------------------------------------------------------------------------------------------
 IDEAS
 ---------------------------------------------------------------------------------------------------
+charging enemy, can only be hit from the back
+
 stamina system
 
 20 arcana bosses might be too much, maybe make arcanas into spells/abilities and make kings/queens bosses

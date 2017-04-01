@@ -34,6 +34,19 @@ class Card {
     function new() {}
 }
 
+typedef Particle = {
+    x: Float,
+    y: Float,
+    color: Int,
+    width: Float,
+    width_final: Float,
+    t: Float,
+    t_max: Float,
+    dx: Float,
+    dy: Float,
+    ddy: Float
+}
+
 @:publicFields
 class Game {
     static inline var DRAW_COORDINATES = false;
@@ -41,8 +54,14 @@ class Game {
     static inline var DRAW_IMAGE_COVER = true;
     static inline var DRAW_TRANSPARENT_COVER = true;
     static inline var DRAW_CARD_LEVEL = true;
-    static inline var NO_ARROW_HACK = true;
+    static inline var ARROW_HACK = false;
     static inline var DRAW_LOS_DEBUG = false;
+
+    static var default_item_type = null;
+    static var default_weapon_type = null;
+    static var default_armor_type = null;
+    static var default_consumable_type = null;
+
     static inline var tilesize = 64;
     static inline var cardmap_width = 5;
     static inline var cardmap_height = 3;
@@ -69,6 +88,8 @@ class Game {
     var hover_info = "";
     var message_text = "";
     var message_time_left = 0;
+    static inline var message_x = inventory_x;
+    static inline var message_y = 420;
     static var message_fade_length = 180;
 
     var walls = Data.bool_2dvector(map_width, map_height);
@@ -113,11 +134,10 @@ class Game {
     }
 
     function random_card_type():Dynamic {
-        // 20% item, 20% nothing, 60% dude
         var k = Random.int(1, 100);
-        if (k <= 20) {
+        if (k <= 30) {
             return CardType_Treasure;
-        } else if (k <= 40) {
+        } else if (k <= 50) {
             return CardType_Nothing;
         } else {
             return CardType_Dude;
@@ -167,6 +187,17 @@ class Game {
         walls[player.x][player.y] = false;
         player.real_x = player.x * tilesize;
         player.real_y = player.y * tilesize;
+
+
+        if (ARROW_HACK) {
+            var arrows = new Item();
+            arrows.type = ItemType_Arrows;
+            arrows.amount = 99;
+            arrows.tile = Tiles.Arrows;
+            arrows.name = "Arrows";
+            arrows.on_ground = false;
+            inventory[inventory_slots - 1] = arrows;
+        }
     }
 
     function make_message(text: String) {
@@ -327,16 +358,27 @@ class Game {
             item.y = free_cell.y;
             item.type = random_enum(ItemType, 1);
 
+            if (default_item_type != null) {
+                item.type = default_item_type;
+            }
+
             item.info += '\nI am ${item.type}!';
 
             if (item.type == ItemType_Consumable) {
-                item.consumable_type = random_enum(ConsumableType);
+                item.consumable_type = random_enum(ConsumableType, 1);
+                if (default_consumable_type != null) {
+                    item.type = default_consumable_type;
+                }
                 item.value = 2 * card_level;
                 item.tile = Tiles.Potion;
                 item.name = "Potion";
             } else if (item.type == ItemType_Armor) {
                 item.armor_type = random_enum(ArmorType, 1);
-                item.value = 5 * card_level;
+                if (default_armor_type != null) {
+                    item.consumable_type = default_armor_type;
+                }
+                item.value = Std.int(Random.float(1, 1.5) * card_level);
+                item.value_max = item.value;
                 item.name = "Armor";
                 switch (item.armor_type) {
                     case ArmorType_Chest: item.tile = Tiles.Chest;
@@ -346,6 +388,9 @@ class Game {
                 }
             } else if (item.type == ItemType_Weapon) {
                 item.weapon_type = random_enum(WeaponType, 1);
+                if (default_weapon_type != null) {
+                    item.weapon_type = default_weapon_type;
+                }
 
                 item.name = "Weapon";
                 switch (item.weapon_type) {
@@ -543,7 +588,16 @@ class Game {
             }
         }
 
+        if (player.angle != 0 && !player.hit) {
+            if (Math.abs(player.angle) < 0.1) {
+                player.angle = 0;
+            } else {
+                player.angle = Math.lerp(player.angle, 0, 0.4);
+            }
+        }
+        Gfx.rotation(player.angle); 
         Gfx.draw_tile(player.real_x, player.real_y, Tiles.Player);
+        Gfx.rotation(0); 
 
         for (dude in Entity.get(Dude)) {
             if (!dude.dead) {
@@ -572,7 +626,7 @@ class Game {
                         Gfx.fill_box(x * card_width * tilesize, y * card_height * tilesize,
                             card_width * tilesize, card_height * tilesize, card_color, 0.5);
                     }
-                    if (DRAW_CARD_LEVEL) {
+                    if (DRAW_CARD_LEVEL && cards[x][y].type != CardType_Nothing) {
                         Text.display(x * card_width * tilesize, y * card_height * tilesize, '${cards[x][y].level}', Col.WHITE);
                         Text.display((x + 1) * card_width * tilesize - tilesize / 2, (y + 1) * card_height * tilesize - tilesize, 
                             '${cards[x][y].level}', Col.WHITE);
@@ -594,8 +648,6 @@ class Game {
         Text.display(inventory_x, 540, 'Armor: ${player.armor}');
         Text.display(inventory_x, 600, hover_info);
 
-        var message_x = inventory_x;
-        var message_y = 700;
         if (message_time_left > 0) {
             if (Math.point_box_intersect(Mouse.x, Mouse.y, message_x, message_y, Text.width(message_text), Text.height())) {
                 message_time_left = Std.int(message_fade_length * 1.5);
@@ -757,7 +809,7 @@ class Game {
 
             if (player.dx != 0 || player.dy != 0) {
                 var can_attack = true;
-                if (player.weapon == WeaponType_Bow && !NO_ARROW_HACK) {
+                if (player.weapon == WeaponType_Bow) {
                     var have_arrows = false;
                     for (i in 0...inventory.length) {
                         if (inventory[i] != null && inventory[i].type == ItemType_Arrows) {
@@ -834,13 +886,57 @@ class Game {
                 player.armor -= item.value;
             } else if (item.type == ItemType_Weapon) {
                 player.weapon = WeaponType_None;
+            } else if (item.type == ItemType_Arrows && player.weapon == WeaponType_Bow) {
+                var have_arrows = false;
+                for (i in 0...inventory.length) {
+                    if (inventory[i] != null && inventory[i] != item && inventory[i].type == ItemType_Arrows && inventory[i].amount > 0) {
+                        have_arrows = true;
+                        break;
+                    }
+                }
+
+                if (have_arrows) {
+                    player.weapon = WeaponType_Bow;
+                } else {
+                    player.weapon = WeaponType_None;
+                }
             }
         }
         function equip(item) {
             if (item.type == ItemType_Armor) {
                 player.armor += item.value;
             } else if (item.type == ItemType_Weapon) {
-                player.weapon = item.weapon_type;
+                if (item.weapon_type == WeaponType_Bow) {
+                    // Change weapon to bow only if there are arrows to shoot, otherwise player attacks default to fists
+                    var have_arrows = false;
+                    for (i in 0...inventory.length) {
+                        if (inventory[i] != null && inventory[i].type == ItemType_Arrows && inventory[i].amount > 0) {
+                            have_arrows = true;
+                            break;
+                        }
+                    }
+
+                    if (have_arrows) {
+                        player.weapon = WeaponType_Bow;
+                    } else {
+                        player.weapon = WeaponType_None;
+                    }
+                } else {
+                    player.weapon = item.weapon_type;
+                }
+            } else if (item.type == ItemType_Arrows) {
+                // Change weapon to bow if equipping arrows with a bow
+                var have_bow = false;
+                for (i in 0...inventory.length) {
+                    if (inventory[i] != null && inventory[i].type == ItemType_Weapon && inventory[i].weapon_type == WeaponType_Bow) {
+                        have_bow = true;
+                        break;
+                    }
+                }
+
+                if (have_bow) {
+                    player.weapon = WeaponType_Bow;
+                }
             }
         }
 
@@ -939,7 +1035,7 @@ class Game {
                     if (can_drop) {
                         dragged_item.x = drop_x;
                         dragged_item.y = drop_y;
-
+                        trace(dragged_item.consumable_type);
                         if (dragged_item.consumable_type == ConsumableType_Potion) {
                             try_consume(dragged_item);
                         }
@@ -1193,6 +1289,9 @@ class Game {
                     // Attack if next to player
                     if (Math.abs(dude_player_dx) + Math.abs(dude_player_dy) == 1) {
                         dude.attacked = true;
+                        if (!player.moved) {
+                            player.hit = true;
+                        }
                         dude.dx = Math.sign(dude_player_dx);
                         dude.dy = Math.sign(dude_player_dy);
                     }
@@ -1254,11 +1353,17 @@ class Game {
             }
         }
 
+        if (player.hit) {
+            player.angle = Math.sin(state_timer / 2) * 15; // slow it down
+        }
+
 
         state_timer++;
         if (all_visuals_completed) {
             state = GameState_EnemyTurnResult;
             state_timer = 0;
+
+            player.hit = false;
         }
     }
 
@@ -1474,6 +1579,27 @@ class Game {
             }
         }
 
+        function get_item_info(item: Item): String {
+            switch (item.type) {
+                case ItemType_Consumable: {
+                    return 'Consumable: ${item.name}\nType: ${item.consumable_type}\nValue: ${item.value}';
+                }
+                case ItemType_Armor: {
+                    return 'Armor: ${item.name}\nType: ${item.armor_type}\nValue: ${item.value}/${item.value_max}';
+                }
+                case ItemType_Weapon: {
+                    return 'Weapon: ${item.name}\nType: ${item.weapon_type}\nDamage: ${item.value}';
+                }
+                case ItemType_Arrows: {
+                    return 'Arrows: ${item.name}\nAmount: ${item.amount}';
+                }
+                default: return "default item info";
+            }
+        }
+        function get_dude_info(dude: Dude): String {
+            return '${dude.name}\n${dude.hp}/${dude.hp_max}';
+        }
+
         // Item info on hover
         // Enemies takes precedence over items
         var hover_x = Std.int(Mouse.x / tilesize);
@@ -1481,19 +1607,19 @@ class Game {
         hover_info = "";
         if (dragged_item != null) {
             // Dragged item always shows info
-            hover_info = dragged_item.info;
+            hover_info = get_item_info(dragged_item);
         } else if (!out_of_bounds(hover_x, hover_y)) {
             // Ground items and enemies
             for (dude in Entity.get(Dude)) {
                 if (dude.active && hover_x == dude.x && hover_y == dude.y) {
-                    hover_info = dude.info;
+                    hover_info = get_dude_info(dude);
                     break;
                 }
             }
             if (hover_info == "") {
                 for (item in Entity.get(Item)) {
                     if (item.on_ground && hover_x == item.x && hover_y == item.y) {
-                        hover_info = item.info;
+                        hover_info = get_item_info(item);
                         break;
                     }
                 }
@@ -1505,7 +1631,7 @@ class Game {
                     && Math.point_box_intersect(Mouse.x, Mouse.y, inventory_x, inventory_y + i * inventory_slot_size,
                         inventory_slot_size, inventory_slot_size)) 
                 {
-                    hover_info = inventory[i].info;
+                    hover_info = get_item_info(inventory[i]);
                     break;
                 }
             }
