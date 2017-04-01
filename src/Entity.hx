@@ -104,8 +104,8 @@ class Dude extends Entity {
 	var dy = 0;
 	var dead = false;
 	static var classs = Dude;
-	var hp = 1;
-	var hp_max = 1;
+	var hp = 3;
+	var hp_max = 3;
 	static var names = ["Dave", "Stephen", "Max", "Vinny"];
 	var name = names[Random.int(0, names.length - 1)];
 	var info = "";
@@ -124,6 +124,6 @@ class Item extends Entity {
 	var armor_type = ArmorType_None;
 	var weapon_type = WeaponType_None;
 	var consumable_type = ConsumableType_None;
-	var value = 0;
+	var value = 0; // used for armor amount, weapon damage, consumable effect interchangibly
 	var amount = 1;
 }

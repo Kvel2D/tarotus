@@ -1,11 +1,17 @@
 
+no arrows and wearing a bow, default to fist attack?
+proper card images
 start making items
 make a system that controls spawn rates and item progression
+make the fact of being damaged more obvious
 
 
 DONE:
-add "no arrows" tooltip
-LOS system
+fix weapons
+rewrite drag system
+armor mechanic
+generated card types now have different chances
+armor break mechanic
 
 ---------------------------------------------------------------------------------------------------
 MILESTONES

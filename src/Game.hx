@@ -29,6 +29,7 @@ class Card {
     var age = 0;
     var x = 0;
     var y = 0;
+    var level = 0;
 
     function new() {}
 }
@@ -37,9 +38,10 @@ class Card {
 class Game {
     static inline var DRAW_COORDINATES = false;
     static inline var UPDATE_CARDS = true;
-    static inline var DRAW_IMAGE_COVER = false;
+    static inline var DRAW_IMAGE_COVER = true;
     static inline var DRAW_TRANSPARENT_COVER = true;
-    static inline var REQUIRE_ARROWS = false;
+    static inline var DRAW_CARD_LEVEL = true;
+    static inline var NO_ARROW_HACK = true;
     static inline var DRAW_LOS_DEBUG = false;
     static inline var tilesize = 64;
     static inline var cardmap_width = 5;
@@ -63,6 +65,7 @@ class Game {
     var drag_dx = 0;
     var drag_dy = 0;
     var dragged_item:Item = null;
+    var dragged_item_inventory_slot = 0;
     var hover_info = "";
     var message_text = "";
     var message_time_left = 0;
@@ -74,6 +77,10 @@ class Game {
     static inline var total_cards = cardmap_width * cardmap_height;
     static inline var card_update_timer_max = 10; // turns
     var card_update_timer = card_update_timer_max;
+    var card_level = 1; // level of generated cards(updated after every x cards are generaed)
+    static inline var card_level_increment_timer_min = 5;
+    static inline var card_level_increment_timer_max = 8;
+    var card_level_increment_timer = Random.int(card_level_increment_timer_min, card_level_increment_timer_max);
 
     var player:Player;
 
@@ -105,6 +112,18 @@ class Game {
         return Type.allEnums(enum_type)[k];
     }
 
+    function random_card_type():Dynamic {
+        // 20% item, 20% nothing, 60% dude
+        var k = Random.int(1, 100);
+        if (k <= 20) {
+            return CardType_Treasure;
+        } else if (k <= 40) {
+            return CardType_Nothing;
+        } else {
+            return CardType_Dude;
+        }
+    }
+
     function new() {
         Walls.generate();
 
@@ -126,7 +145,7 @@ class Game {
                 cards[i][j].x = i;
                 cards[i][j].y = j;
                 // NOTE: watch out for when you add more card types that should not be rare
-                cards[i][j].type = random_enum(CardType, 1);
+                cards[i][j].type = random_card_type();
                 cards[i][j].covered = true;
             }
         }
@@ -141,6 +160,7 @@ class Game {
         for (x in 0...cardmap_width) {
             for (y in 0...cardmap_height) {
                 generate_card(cards[x][y]);
+                cards[x][y].level = card_level;
             }
         }
 
@@ -285,7 +305,7 @@ class Game {
             }
         }
 
-
+        //TODO: make a better formula for item and dude values based on card level(currently simply linear)
         if (card.type == CardType_Dude) {
             // Spawn dude
             var dude = new Dude();
@@ -296,6 +316,9 @@ class Game {
             dude.real_y = dude.y * tilesize;
             walls[dude.x][dude.y] = false;
             update_dude_info(dude);
+
+            dude.hp_max = card_level;
+            dude.hp = dude.hp_max;
         } else if (card.type == CardType_Treasure) {
             // Spawn random item
             var item = new Item();
@@ -303,17 +326,17 @@ class Game {
             item.x = free_cell.x;
             item.y = free_cell.y;
             item.type = random_enum(ItemType, 1);
-            
+
             item.info += '\nI am ${item.type}!';
 
             if (item.type == ItemType_Consumable) {
                 item.consumable_type = random_enum(ConsumableType);
-                item.value = 2;
+                item.value = 2 * card_level;
                 item.tile = Tiles.Potion;
                 item.name = "Potion";
             } else if (item.type == ItemType_Armor) {
                 item.armor_type = random_enum(ArmorType, 1);
-                item.value = 5;
+                item.value = 5 * card_level;
                 item.name = "Armor";
                 switch (item.armor_type) {
                     case ArmorType_Chest: item.tile = Tiles.Chest;
@@ -323,7 +346,14 @@ class Game {
                 }
             } else if (item.type == ItemType_Weapon) {
                 item.weapon_type = random_enum(WeaponType, 1);
+
                 item.name = "Weapon";
+                switch (item.weapon_type) {
+                    case WeaponType_Sword: item.value = 2 * card_level;
+                    case WeaponType_Spear: item.value = 1 * card_level;
+                    case WeaponType_Bow: item.value = 1 * card_level;
+                    default: item.value = 0;
+                }
                 switch (item.weapon_type) {
                     case WeaponType_Sword: item.tile = Tiles.Sword;
                     case WeaponType_Spear: item.tile = Tiles.Spear;
@@ -469,6 +499,8 @@ class Game {
             Text.display(x, y, item.name);
             if (item.type == ItemType_Arrows) {
                 Text.display(x + tilesize / 10, y + tilesize / 2, '${item.amount}');
+            } else if (item.type == ItemType_Armor && item.value <= 0) {
+                Gfx.fill_box(x, y, tilesize, tilesize, Col.RED, 0.5);
             }
         }
 
@@ -500,7 +532,7 @@ class Game {
         Gfx.line_thickness = 1;
 
         for (item in Entity.get(Item)) {
-            if (item.on_ground) {
+            if (item.on_ground && item != dragged_item) {
                 draw_item(item.x * tilesize, item.y * tilesize, item);
             }
         }
@@ -520,6 +552,9 @@ class Game {
             }
         }
 
+
+        var font_size = Text.currentsize;
+        Text.change_size(60);
         for (x in 0...cardmap_width) {
             for (y in 0...cardmap_height) {
                 if (cards[x][y].covered) {
@@ -530,15 +565,23 @@ class Game {
                         case CardType_Treasure: card_color = Col.YELLOW;
                         case CardType_None: card_color = Col.PINK;
                     }
+                    if (DRAW_IMAGE_COVER) {
+                        Gfx.draw_image(x * card_width * tilesize, y * card_height * tilesize, "card");
+                    }
                     if (DRAW_TRANSPARENT_COVER) {
                         Gfx.fill_box(x * card_width * tilesize, y * card_height * tilesize,
-                            card_width * tilesize, card_height * tilesize, card_color, 0.2);
-                    } else if (DRAW_IMAGE_COVER) {
-                        Gfx.draw_image(x * card_width * tilesize, y * card_height * tilesize, "card");
+                            card_width * tilesize, card_height * tilesize, card_color, 0.5);
+                    }
+                    if (DRAW_CARD_LEVEL) {
+                        Text.display(x * card_width * tilesize, y * card_height * tilesize, '${cards[x][y].level}', Col.WHITE);
+                        Text.display((x + 1) * card_width * tilesize - tilesize / 2, (y + 1) * card_height * tilesize - tilesize, 
+                            '${cards[x][y].level}', Col.WHITE);
                     }
                 }
             }
         }
+        Text.change_size(font_size);
+
 
         if (dragged_item != null) {
             draw_item(Mouse.x - drag_dx, Mouse.y - drag_dy, dragged_item);
@@ -714,7 +757,7 @@ class Game {
 
             if (player.dx != 0 || player.dy != 0) {
                 var can_attack = true;
-                if (player.weapon == WeaponType_Bow && REQUIRE_ARROWS) {
+                if (player.weapon == WeaponType_Bow && !NO_ARROW_HACK) {
                     var have_arrows = false;
                     for (i in 0...inventory.length) {
                         if (inventory[i] != null && inventory[i].type == ItemType_Arrows) {
@@ -740,7 +783,7 @@ class Game {
             }
         }
 
-        // Drag
+        // Drag start
         if (state == GameState_PlayerTurn) {
             if (Mouse.left_click()) {
                 var x = Std.int(Mouse.x / tilesize);
@@ -758,25 +801,23 @@ class Game {
                     }
                     if (dragged_item != null
                         && Math.abs(dragged_item.x - player.x) < 2
-                        && Math.abs(dragged_item.y - player.y) < 2) {
+                        && Math.abs(dragged_item.y - player.y) < 2) 
+                    {
                         state = GameState_ItemDrag;
-                    dragged_item.on_ground = false;
+                    } else {
+                        dragged_item = null;
+                    }
                 } else {
-                    dragged_item = null;
-                }
-            } else {
                     // Inventory items
                     for (i in 0...inventory_slots) {
                         if (inventory[i] != null
                             && Math.point_box_intersect(Mouse.x, Mouse.y, inventory_x, inventory_y + i * inventory_slot_size,
-                                inventory_slot_size, inventory_slot_size)) {
+                                inventory_slot_size, inventory_slot_size)) 
+                        {
                             state = GameState_ItemDrag;
-                        dragged_item = inventory[i];
-                        inventory[i] = null;
-                            // Unequip item
-                            if (dragged_item.type == ItemType_Armor) {
-                                player.armor -= dragged_item.value;
-                            }
+                            dragged_item = inventory[i];
+                            dragged_item_inventory_slot = i;
+                            inventory[i] = null;
                             break;
                         }
                     }
@@ -788,11 +829,27 @@ class Game {
     }
 
     function update_item_drag() {
+        function unequip(item) {
+            if (item.type == ItemType_Armor) {
+                player.armor -= item.value;
+            } else if (item.type == ItemType_Weapon) {
+                player.weapon = WeaponType_None;
+            }
+        }
+        function equip(item) {
+            if (item.type == ItemType_Armor) {
+                player.armor += item.value;
+            } else if (item.type == ItemType_Weapon) {
+                player.weapon = item.weapon_type;
+            }
+        }
+
         if (Mouse.left_released()) {
             var put_in_inventory = false;
+            var slot_index = -1;
+
+            // Mouse is hovering over inventory, so check if it's possible
             if (Mouse.x > inventory_x - 5) {
-                // Drop into inventory
-                var slot_index = 0;
                 for (i in 0...inventory_slots) {
                     if (Math.point_box_intersect(Mouse.x, Mouse.y, inventory_x, inventory_y + i * inventory_slot_size,
                         inventory_slot_size, inventory_slot_size)) 
@@ -801,89 +858,108 @@ class Game {
                         break;
                     }
                 }
-                var can_put_in_inventory = true;
+                if (slot_index != -1) {
+                    put_in_inventory = true;
+                }
 
                 // Can equip only one type of armor or weapon
                 if (dragged_item.type == ItemType_Armor) {
                     for (i in 0...inventory_slots) {
                         if (i != slot_index 
                             && inventory[i] != null 
+                            && inventory[i] != dragged_item
                             && inventory[i].type == ItemType_Armor 
                             && inventory[i].armor_type == dragged_item.armor_type) 
                         {
-                            can_put_in_inventory = false;
+                            put_in_inventory = false;
                             break;
                         }
                     }
                 }
+                // Can equip only one weapon
                 if (dragged_item.type == ItemType_Weapon) {
                     for (i in 0...inventory_slots) {
                         if (i != slot_index 
                             && inventory[i] != null 
-                            && inventory[i].type == ItemType_Weapon 
-                            && inventory[i].weapon_type == dragged_item.weapon_type) 
+                            && inventory[i] != dragged_item
+                            && inventory[i].type == ItemType_Weapon) 
                         {
-                            can_put_in_inventory = false;
+                            put_in_inventory = false;
                             break;
                         }
                     }
                 }     
+            }
 
-                if (can_put_in_inventory) {
-                    // Switch items if current slot isn't empty
+            if (put_in_inventory) {
+                if (dragged_item.on_ground) {
+                    // Dropping item from ground into inventory
+
+                    // If slot is occupied, switch two items
                     if (inventory[slot_index] != null) {
+                        unequip(inventory[slot_index]);
                         inventory[slot_index].x = dragged_item.x;
                         inventory[slot_index].y = dragged_item.y;
                         inventory[slot_index].on_ground = true;
                     }
-
+                    equip(dragged_item);
                     inventory[slot_index] = dragged_item;
-                    put_in_inventory = true;
+                    dragged_item.on_ground = false;
                     dragged_item.x = -1;
                     dragged_item.y = -1;
+                } else {
+                    // Dropping item from inventory into inventory
 
-                    // Equip item
-                    if (dragged_item.type == ItemType_Armor) {
-                        player.armor += dragged_item.value;
-                    } else if (dragged_item.type == ItemType_Weapon) {
-                        player.weapon = dragged_item.weapon_type;
+                    // If slot is occupied, switch two items
+                    if (inventory[slot_index] != null) {
+                        inventory[dragged_item_inventory_slot] = inventory[slot_index];
                     }
+                    inventory[slot_index] = dragged_item;
                 }
-            }
-
-            if (!put_in_inventory) {
-                dragged_item.on_ground = true;
-                // Change position on ground
+            } else {
                 var drop_x = Std.int(Mouse.x / tilesize);
                 var drop_y = Std.int(Mouse.y / tilesize);
-                if (Math.abs(drop_x - player.x) < 2 && Math.abs(drop_y - player.y) < 2) {
-                    dragged_item.x = drop_x;
-                    dragged_item.y = drop_y;
+                var can_drop = !out_of_bounds(drop_x, drop_y) 
+                && !walls[drop_x][drop_y] 
+                && Math.abs(drop_x - player.x) < 2 
+                && Math.abs(drop_y - player.y) < 2;
 
-                    // Consume item if dropped onto player
-                    if (dragged_item.type == ItemType_Consumable && drop_x == player.x && drop_y == player.y) {
-                        if (dragged_item.consumable_type == ConsumableType_Potion) {
-                            player.hp += dragged_item.value;
-                            if (player.hp > player.hp_max) {
-                                player.hp = player.hp_max;
-                            }
-                            dragged_item.delete();
+                function try_consume(item) {
+                    if (drop_x == player.x && drop_y == player.y) {
+                        player.hp += dragged_item.value;
+                        if (player.hp > player.hp_max) {
+                            player.hp = player.hp_max;
                         }
+                        dragged_item.delete();
+                    }
+                }
+
+                if (dragged_item.on_ground) {
+                    // Change item position on ground
+                    if (can_drop) {
+                        dragged_item.x = drop_x;
+                        dragged_item.y = drop_y;
+
+                        if (dragged_item.consumable_type == ConsumableType_Potion) {
+                            try_consume(dragged_item);
+                        }
+                    }
+                } else {
+                    if (can_drop) {
+                        unequip(dragged_item);
+                        dragged_item.x = drop_x;
+                        dragged_item.y = drop_y;
+                        dragged_item.on_ground = true;
+
+                        if (dragged_item.consumable_type == ConsumableType_Potion) {
+                            try_consume(dragged_item);
+                        }
+                    } else {
+                        inventory[dragged_item_inventory_slot] = dragged_item;
                     }
                 }
             }
 
-            // check if no weapon is equipped
-            var no_weapon = true;
-            for (i in 0...inventory_slots) {
-                if (inventory[i] != null && inventory[i].type == ItemType_Weapon && inventory[i].weapon_type != WeaponType_None) {
-                    no_weapon = false;
-                    break;
-                }
-            }
-            if (no_weapon) {
-                player.weapon = WeaponType_None;
-            }
 
             dragged_item = null;
             state = GameState_PlayerTurn;
@@ -1020,6 +1096,15 @@ class Game {
                 case WeaponType_Spear: attack_distance = 2;
                 case WeaponType_Bow: attack_distance = Std.int(Math.max(map_width, map_height));
             }
+
+            var attack_damage = 1;
+            for (i in 0...inventory_slots) {
+                if (inventory[i] != null && inventory[i].type == ItemType_Weapon) {
+                    attack_damage = inventory[i].value;
+                    break;
+                }
+            }
+
             var hit_cells = new Array<IntVector2>();
             var i = 0;
             var hit_x = 0;
@@ -1048,7 +1133,7 @@ class Game {
                 }
             }
             if (hit_dude != null) {
-                hit_dude.hp--;
+                hit_dude.hp -= attack_damage;
                 if (hit_dude.hp <= 0) {
                     hit_dude.dead = true;
                 }
@@ -1187,8 +1272,46 @@ class Game {
                     dude.real_x = dude.x * tilesize;
                     dude.real_y = dude.y * tilesize;
                 } else if (dude.attacked) {
+                    var damage = 1;
+
                     if (player.x == dude.x + dude.dx && player.y == dude.y + dude.dy) {
-                        player.hp--;
+                        if (player.armor != 0) {
+                            // Apply damage to armor that has the biggest value left
+                            // Until no damage left or no armor left
+                            var armor_queue = new Array<Item>();
+                            for (i in 0...inventory_slots) {
+                                if (inventory[i] != null && inventory[i].type == ItemType_Armor) {
+                                    armor_queue.push(inventory[i]);
+                                }
+                            }
+                            armor_queue.sort(function(x, y) 
+                            { 
+                                return x.value - y.value;
+                            });
+
+                            var hit_armor: Item = null;
+                            while (damage > 0 && armor_queue.length != 0) {
+                                hit_armor = armor_queue[armor_queue.length - 1];
+
+                                if (damage >= hit_armor.value) {
+                                    damage -= hit_armor.value;
+                                    player.armor -= hit_armor.value;
+                                    hit_armor.value = 0;
+                                    armor_queue.pop();
+                                } else {
+                                    hit_armor.value -= damage;
+                                    player.armor -= damage;
+                                    damage = 0;
+                                }
+                            }
+                        }
+
+
+
+                        // If armor didnt absorb all the damage apply some to health
+                        if (damage > 0) {
+                            player.hp -= damage;
+                        }
                     }
                 } else if (dude.dead) {
                     dead_dudes.push(dude);
@@ -1213,8 +1336,12 @@ class Game {
             }
         }
 
-        var uncovered_percentage = cards_uncovered / total_cards;
+        //
+        //  CARD UPDATE
+        //
+
         // Start updating cards when more than 30% cards are uncovered
+        var uncovered_percentage = cards_uncovered / total_cards;
         if (uncovered_percentage > 0.3 && UPDATE_CARDS) {
             card_update_timer--;
             if (uncovered_percentage > 0.7) {
@@ -1259,11 +1386,39 @@ class Game {
                 }
 
                 if (updated_card != null) {
+                    // Remove items on card
+                    var removed_items = new Array<Item>();
+                    for (item in Entity.get(Item)) {
+                        if (item.on_ground && Std.int(item.x / card_width) == updated_card.x && Std.int(item.y / card_height) == updated_card.y) {
+                            removed_items.push(item);
+                        }
+                    }
+                    for (item in removed_items) {
+                        item.delete();
+                    }
+                    // Remove dudes on card
+                    var removed_dudes = new Array<Item>();
+                    for (dude in Entity.get(Dude)) {
+                        if (Std.int(dude.x / card_width) == updated_card.x && Std.int(dude.y / card_height) == updated_card.y) {
+                            removed_dudes.push(dude);
+                        }
+                    }
+                    for (dude in removed_dudes) {
+                        dude.delete();
+                    }
+
                     card_update_timer = card_update_timer_max;
-                    updated_card.type = random_enum(CardType, 1);
+                    updated_card.type = random_card_type();
                     updated_card.covered = true;
                     generate_card(updated_card);
+                    updated_card.level = card_level;
                     cards_uncovered--;
+
+                    card_level_increment_timer--;
+                    if (card_level_increment_timer <= 0) {
+                        card_level++;
+                        card_level_increment_timer = Random.int(card_level_increment_timer_min, card_level_increment_timer_max); 
+                    }
                 }
             }
         }
@@ -1366,6 +1521,6 @@ class Game {
             case GameState_CardFlip: update_card_flip();
         }
 
-        GUI.enum_setter(1000, 600, function(x) { player.weapon = x; }, player.weapon, WeaponType);
+        GUI.enum_setter(1000, 800, function(x) { player.weapon = x; }, player.weapon, WeaponType);
     }
 }
