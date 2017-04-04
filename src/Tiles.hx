@@ -24,4 +24,5 @@ class Tiles {
     static inline var Bow = tilenum(8, 1);
     static inline var Fist = tilenum(7, 1);
     static inline var Arrows = tilenum(4, 1);
+    static inline var Trash = tilenum(1, 1);
 }

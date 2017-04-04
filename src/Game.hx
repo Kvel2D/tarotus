@@ -57,7 +57,7 @@ class Game {
     static inline var ARROW_HACK = false;
     static inline var DRAW_LOS_DEBUG = false;
 
-    static var default_item_type = null;
+    static var default_item_type = ItemType_Weapon;
     static var default_weapon_type = null;
     static var default_armor_type = null;
     static var default_consumable_type = null;
@@ -73,6 +73,8 @@ class Game {
     static inline var inventory_x = 1000;
     static inline var inventory_y = 64;
     static inline var inventory_slot_size = 64;
+    static inline var trash_x = inventory_x;
+    static inline var trash_y = inventory_y + inventory_slot_size * inventory_slots + 20;
 
     var state = GameState_PlayerTurn;
     var state_timer = 0; // reset to 0 by state at completion
@@ -436,6 +438,11 @@ class Game {
         for (dude in Entity.get(Dude)) {
             move_map[dude.x + dude.dx][dude.y + dude.dy] = false;
         }
+        for (item in Entity.get(Item)) {
+            if (item.on_ground) {
+                move_map[item.x][item.y] = false;
+            }
+        }
         move_map[x1][y1] = false; // ignore the dude itself
         for (x in 0...map_width) {
             for (y in 0...map_height) {
@@ -587,6 +594,7 @@ class Game {
                 draw_item(inventory_x, inventory_y + i * inventory_slot_size, inventory[i]);
             }
         }
+        Gfx.draw_tile(trash_x, trash_y, Tiles.Trash);
 
         if (player.angle != 0 && !player.hit) {
             if (Math.abs(player.angle) < 0.1) {
@@ -675,23 +683,64 @@ class Game {
         return x < 0 || y < 0 || x >= map_width || y >= map_height;
     }
 
-    function space_is_free(x:Int, y:Int, ignored_entity:Dynamic = null):Bool {
-        if (out_of_bounds(x, y)) {
-            return false;
-        }
-        for (dude in Entity.get(Dude)) {
-            if (dude != ignored_entity && dude.x + dude.dx == x && dude.y + dude.dy == y) {
-                return false;
+    function unequip(item: Item) {
+        if (item.type == ItemType_Armor) {
+            player.armor -= item.value;
+        } else if (item.type == ItemType_Weapon) {
+            player.weapon = WeaponType_None;
+        } else if (item.type == ItemType_Arrows && player.weapon == WeaponType_Bow) {
+            var have_arrows = false;
+            for (i in 0...inventory.length) {
+                if (inventory[i] != null && inventory[i] != item && inventory[i].type == ItemType_Arrows && inventory[i].amount > 0) {
+                    have_arrows = true;
+                    break;
+                }
+            }
+
+            if (have_arrows) {
+                player.weapon = WeaponType_Bow;
+            } else {
+                player.weapon = WeaponType_None;
             }
         }
-        if (player != ignored_entity) {
-            if (player.moved && player.x + player.dx == x && player.y + player.dy == y) {
-                return false;
-            } else if (player.x == x && player.y == y) {
-                return false;
+    }
+
+    function equip(item: Item) {
+        if (item.type == ItemType_Armor) {
+            player.armor += item.value;
+        } else if (item.type == ItemType_Weapon) {
+            if (item.weapon_type == WeaponType_Bow) {
+                // Change weapon to bow only if there are arrows to shoot, otherwise player attacks default to fists
+                var have_arrows = false;
+                for (i in 0...inventory.length) {
+                    if (inventory[i] != null && inventory[i].type == ItemType_Arrows && inventory[i].amount > 0) {
+                        have_arrows = true;
+                        break;
+                    }
+                }
+
+                if (have_arrows) {
+                    player.weapon = WeaponType_Bow;
+                } else {
+                    player.weapon = WeaponType_None;
+                }
+            } else {
+                player.weapon = item.weapon_type;
+            }
+        } else if (item.type == ItemType_Arrows) {
+            // Change weapon to bow if equipping arrows with a bow
+            var have_bow = false;
+            for (i in 0...inventory.length) {
+                if (inventory[i] != null && inventory[i].type == ItemType_Weapon && inventory[i].weapon_type == WeaponType_Bow) {
+                    have_bow = true;
+                    break;
+                }
+            }
+
+            if (have_bow) {
+                player.weapon = WeaponType_Bow;
             }
         }
-        return !walls[x][y];
     }
 
     function update_player_turn() {
@@ -758,6 +807,30 @@ class Game {
                     }
                 }
             }
+
+            function space_is_free(x:Int, y:Int, ignored_entity:Dynamic = null):Bool {
+                if (out_of_bounds(x, y)) {
+                    return false;
+                }
+                for (dude in Entity.get(Dude)) {
+                    if (dude != ignored_entity && dude.x + dude.dx == x && dude.y + dude.dy == y) {
+                        return false;
+                    }
+                }
+                for (item in Entity.get(Item)) {
+                    if (item.on_ground && item.x == x && item.y == y) {
+                        return false;
+                    }
+                }
+                if (player != ignored_entity) {
+                    if (player.moved && player.x + player.dx == x && player.y + player.dy == y) {
+                        return false;
+                    } else if (player.x == x && player.y == y) {
+                        return false;
+                    }
+                }
+                return !walls[x][y];
+            }
             if ((player.dx != 0 || player.dy != 0) && state != GameState_CardFlip && space_is_free(move_x, move_y, player)) {
                 state = GameState_PlayerVisual;
                 player.moved = true;
@@ -775,12 +848,25 @@ class Game {
 
             // Attack by clicking
             if (Mouse.right_click()) {
-                var dx = Mouse.x - player.x * tilesize - tilesize / 2;
-                var dy = Mouse.y - player.y * tilesize - tilesize / 2;
-                if (Math.abs(dx) >= Math.abs(dy)) {
-                    player.dx = Math.sign(dx);
-                } else {
-                    player.dy = Math.sign(dy);
+                var x = Std.int(Mouse.x / tilesize);
+                var y = Std.int(Mouse.y / tilesize);
+
+                var clicked_on_dude = false;
+                for (dude in Entity.get(Dude)) {
+                    if (dude.active && dude.x == x && dude.y == y) {
+                        clicked_on_dude = true;
+                        break;
+                    }
+                }
+
+                if (clicked_on_dude) {
+                    var dx = Mouse.x - player.x * tilesize - tilesize / 2;
+                    var dy = Mouse.y - player.y * tilesize - tilesize / 2;
+                    if (Math.abs(dx) >= Math.abs(dy)) {
+                        player.dx = Math.sign(dx);
+                    } else {
+                        player.dy = Math.sign(dy);
+                    }
                 }
             }
 
@@ -809,6 +895,7 @@ class Game {
 
             if (player.dx != 0 || player.dy != 0) {
                 var can_attack = true;
+
                 if (player.weapon == WeaponType_Bow) {
                     var have_arrows = false;
                     for (i in 0...inventory.length) {
@@ -835,8 +922,16 @@ class Game {
             }
         }
 
-        // Drag start
+
+        // Skip turn
+        if (Input.pressed(Key.SPACE)) {
+            state = GameState_PlayerVisual;
+        }
+
+
+        // Item interactions
         if (state == GameState_PlayerTurn) {
+            // Drag start
             if (Mouse.left_click()) {
                 var x = Std.int(Mouse.x / tilesize);
                 var y = Std.int(Mouse.y / tilesize);
@@ -875,77 +970,205 @@ class Game {
                     }
                 }
             }
+
+            // Instant item actions
+            if (Mouse.right_click()) {
+                var x = Std.int(Mouse.x / tilesize);
+                var y = Std.int(Mouse.y / tilesize);
+
+                if (Mouse.x < inventory_x - 1) {
+                    // Map items, insert into free inventory slot or swap with item of same type
+                    var clicked_item: Item = null;
+
+                    for (item in Entity.get(Item)) {
+                        if (item.on_ground && item.x == x && item.y == y) {
+                            clicked_item = item;
+                            break;
+                        }
+                    }
+                    if (clicked_item != null 
+                        && (Math.abs(clicked_item.x - player.x) >= 2 || Math.abs(clicked_item.y - player.y) >= 2)) 
+                    {
+                        clicked_item = null;
+                    }
+
+                    if (clicked_item != null) {
+                        if (clicked_item.type == ItemType_Weapon) {
+                            var equipped_weapon: Item = null;
+                            var equipped_weapon_inventory_slot = 0;
+
+                            for (i in 0...inventory_slots) {
+                                if (inventory[i] != null && inventory[i].type == ItemType_Weapon) {
+                                    equipped_weapon = inventory[i];
+                                    equipped_weapon_inventory_slot = i;
+                                    break;
+                                }
+                            }
+                            if (equipped_weapon == null) {
+                                // Find free slot
+                                for (i in 0...inventory_slots) {
+                                    if (inventory[i] == null) {
+                                        equipped_weapon_inventory_slot = i;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (equipped_weapon != null) {
+                                unequip(equipped_weapon);
+                                equipped_weapon.x = clicked_item.x;
+                                equipped_weapon.y = clicked_item.y;
+                                equipped_weapon.on_ground = true;
+                            }
+
+                            equip(clicked_item);
+                            clicked_item.on_ground = false;
+                            inventory[equipped_weapon_inventory_slot] = clicked_item;
+                        } else if (clicked_item.type == ItemType_Armor) {
+                            var equipped_armor: Item = null;
+                            var equipped_armor_inventory_slot = 0;
+
+                            for (i in 0...inventory_slots) {
+                                if (inventory[i] != null 
+                                    && inventory[i].type == ItemType_Armor 
+                                    && inventory[i].armor_type == clicked_item.armor_type) 
+                                {
+                                    equipped_armor = inventory[i];
+                                    equipped_armor_inventory_slot = i;
+                                    break;
+                                }
+                            }
+                            if (equipped_armor == null) {
+                                // Find free slot
+                                for (i in 0...inventory_slots) {
+                                    if (inventory[i] == null) {
+                                        equipped_armor_inventory_slot = i;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (equipped_armor != null) {
+                                unequip(equipped_armor);
+                                equipped_armor.x = clicked_item.x;
+                                equipped_armor.y = clicked_item.y;
+                                equipped_armor.on_ground = true;
+                            }
+
+                            equip(clicked_item);
+                            clicked_item.on_ground = false;
+                            inventory[equipped_armor_inventory_slot] = clicked_item;
+                        } else {
+                            var open_slot_found = false;
+
+                            for (i in 0...inventory_slots) {
+                                if (inventory[i] == null) {
+                                    equip(clicked_item);
+                                    clicked_item.on_ground = false;
+                                    inventory[i] = clicked_item;
+                                    open_slot_found = true;
+                                    break;
+                                }
+                            }
+
+                            if (!open_slot_found) {
+                                //TODO: add a "no free space" message here
+                            }
+                        }
+                    }
+                } else {
+                    var clicked_item: Item = null;
+                    var clicked_item_inventory_slot = 0;
+
+                    // Inventory items, drop onto nearest empty cell on ground
+                    for (i in 0...inventory_slots) {
+                        if (inventory[i] != null
+                            && Math.point_box_intersect(Mouse.x, Mouse.y, inventory_x, inventory_y + i * inventory_slot_size,
+                                inventory_slot_size, inventory_slot_size)) 
+                        {
+                            clicked_item = inventory[i];
+                            clicked_item_inventory_slot = i;
+                            break;
+                        }
+                    }
+
+                    // Make a map, which is false if there's a wall/item/dude/covered card/player
+                    var free = Data.bool_2dvector(map_width, map_height);
+                    for (x in 0...map_width) {
+                        for (y in 0...map_height) {
+                            free[x][y] = !walls[x][y];
+                        }
+                    }
+                    for (dude in Entity.get(Dude)) {
+                        if (dude.active) {
+                            free[dude.x][dude.y] = false;
+                        }
+                    }
+                    for (item in Entity.get(Item)) {
+                        if (item.on_ground) {
+                            free[item.x][item.y] = false;
+                        }
+                    }
+                    free[player.x][player.y] = false;
+                    var card: Card = null;
+                    for (x in 0...cardmap_width) {
+                        for (y in 0...cardmap_height) {
+                            card = cards[x][y];
+                            if (card.covered) {
+                                for (x2 in card.x * card_width...(card.x + 1) * card_width) {
+                                    for (y2 in card.y * card_height...(card.y + 1) * card_height) {
+                                        free[x2][y2] = false;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Drop item into a free cell near player
+                    var x: Int = 0;
+                    var y: Int = 0;
+                    function drop_item() {
+                        for (dx in -1...2) {
+                            for (dy in -1...2) {
+                                x = player.x + dx;
+                                y = player.y + dy;
+                                if (!out_of_bounds(x, y) && free[x][y]) {
+                                    unequip(clicked_item);
+                                    clicked_item.x = x;
+                                    clicked_item.y = y;
+                                    clicked_item.on_ground = true;
+                                    inventory[clicked_item_inventory_slot] = null;
+                                    return true;
+                                } 
+                            }
+                        }
+                        return false;
+                    }();
+                }
+            }
         }
 
         render();
     }
 
     function update_item_drag() {
-        function unequip(item) {
-            if (item.type == ItemType_Armor) {
-                player.armor -= item.value;
-            } else if (item.type == ItemType_Weapon) {
-                player.weapon = WeaponType_None;
-            } else if (item.type == ItemType_Arrows && player.weapon == WeaponType_Bow) {
-                var have_arrows = false;
-                for (i in 0...inventory.length) {
-                    if (inventory[i] != null && inventory[i] != item && inventory[i].type == ItemType_Arrows && inventory[i].amount > 0) {
-                        have_arrows = true;
-                        break;
-                    }
-                }
-
-                if (have_arrows) {
-                    player.weapon = WeaponType_Bow;
-                } else {
-                    player.weapon = WeaponType_None;
-                }
-            }
-        }
-        function equip(item) {
-            if (item.type == ItemType_Armor) {
-                player.armor += item.value;
-            } else if (item.type == ItemType_Weapon) {
-                if (item.weapon_type == WeaponType_Bow) {
-                    // Change weapon to bow only if there are arrows to shoot, otherwise player attacks default to fists
-                    var have_arrows = false;
-                    for (i in 0...inventory.length) {
-                        if (inventory[i] != null && inventory[i].type == ItemType_Arrows && inventory[i].amount > 0) {
-                            have_arrows = true;
-                            break;
-                        }
-                    }
-
-                    if (have_arrows) {
-                        player.weapon = WeaponType_Bow;
-                    } else {
-                        player.weapon = WeaponType_None;
-                    }
-                } else {
-                    player.weapon = item.weapon_type;
-                }
-            } else if (item.type == ItemType_Arrows) {
-                // Change weapon to bow if equipping arrows with a bow
-                var have_bow = false;
-                for (i in 0...inventory.length) {
-                    if (inventory[i] != null && inventory[i].type == ItemType_Weapon && inventory[i].weapon_type == WeaponType_Bow) {
-                        have_bow = true;
-                        break;
-                    }
-                }
-
-                if (have_bow) {
-                    player.weapon = WeaponType_Bow;
-                }
-            }
-        }
 
         if (Mouse.left_released()) {
             var put_in_inventory = false;
+            var put_in_trash = false;
             var slot_index = -1;
 
-            // Mouse is hovering over inventory, so check if it's possible
-            if (Mouse.x > inventory_x - 5) {
+            if (Math.point_box_intersect(Mouse.x, Mouse.y, trash_x, trash_y, inventory_slot_size, inventory_slot_size)) {
+                // Trash item
+                if (dragged_item.on_ground) {
+                    dragged_item.delete();
+                } else {
+                    unequip(dragged_item);
+                    dragged_item.delete();
+                }
+                put_in_trash = true;
+            } else if (Mouse.x > inventory_x - 5) {
+                // Mouse is hovering over inventory, so check if it's possible
                 for (i in 0...inventory_slots) {
                     if (Math.point_box_intersect(Mouse.x, Mouse.y, inventory_x, inventory_y + i * inventory_slot_size,
                         inventory_slot_size, inventory_slot_size)) 
@@ -1012,7 +1235,7 @@ class Game {
                     }
                     inventory[slot_index] = dragged_item;
                 }
-            } else {
+            } else if (!put_in_trash) {
                 var drop_x = Std.int(Mouse.x / tilesize);
                 var drop_y = Std.int(Mouse.y / tilesize);
                 var can_drop = !out_of_bounds(drop_x, drop_y) 

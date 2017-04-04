@@ -1,20 +1,23 @@
 
-proper card images
-start making items
+separate weapon and treasure cards
+more items
 limit number of each type of card
 do make an experience system, levels raise your max health/mana, stats, stats are needed for weapons
 make bow consume arrow stack with least amount
 limit potion effect top max hp
-simply drop/equip: right click for instant equip/switch or drop from inventory to nearest cell
 weapons do need to break(breaking halves damage)
 more error messages(for weapon equipping for example)
+if im gonna make an exp system, there's a gotta be a way to miss out on enemies/exp
 
 
 DONE:
-player getting hit visual
-fix consumable usage
-more item/dude info
-default to fist attack when there are no arrows for bow attack
+skip turn
+attack only if clicked on enemy
+make item action use right click
+instant equip
+instant unequip
+items block path
+item deletion
 
 ---------------------------------------------------------------------------------------------------
 MILESTONES
@@ -30,6 +33,8 @@ card magic
 ---------------------------------------------------------------------------------------------------
 IDEAS
 ---------------------------------------------------------------------------------------------------
+ITEMS BLOCK THE WAY
+
 charging enemy, can only be hit from the back
 
 stamina system
