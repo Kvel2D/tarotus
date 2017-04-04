@@ -1,23 +1,12 @@
 
-separate weapon and treasure cards
 more items
 limit number of each type of card
 do make an experience system, levels raise your max health/mana, stats, stats are needed for weapons
-make bow consume arrow stack with least amount
-limit potion effect top max hp
-weapons do need to break(breaking halves damage)
-more error messages(for weapon equipping for example)
 if im gonna make an exp system, there's a gotta be a way to miss out on enemies/exp
-
+think through update system
 
 DONE:
-skip turn
-attack only if clicked on enemy
-make item action use right click
-instant equip
-instant unequip
-items block path
-item deletion
+
 
 ---------------------------------------------------------------------------------------------------
 MILESTONES
@@ -33,8 +22,6 @@ card magic
 ---------------------------------------------------------------------------------------------------
 IDEAS
 ---------------------------------------------------------------------------------------------------
-ITEMS BLOCK THE WAY
-
 charging enemy, can only be hit from the back
 
 stamina system
@@ -45,8 +32,6 @@ dudes that just block the way and don't attack(but do move)
 generate presets by generating a dungeon completely first and then breaking it down into elements
 
 powerful weapons take an extra turn to use
-
-magic
 
 fix unreachable cells, a better way might be to do a pass after all cards are generated and then do a full pass everytime a new card is generated
 

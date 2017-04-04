@@ -8,9 +8,9 @@ enum DoorColor {
 
 enum ItemType {
 	ItemType_None;
+	ItemType_Weapon;
 	ItemType_Armor;
 	ItemType_Consumable;
-	ItemType_Weapon;
 	ItemType_Arrows;
 }
 
@@ -104,6 +104,7 @@ class Dude extends Entity {
 	var following_player = false;
 	var dx = 0;
 	var dy = 0;
+	var hit = false;
 	var dead = false;
 	static var classs = Dude;
 	var hp = 3;
@@ -112,6 +113,7 @@ class Dude extends Entity {
 	var name = names[Random.int(0, names.length - 1)];
 	var info = "";
 	var points = new Array<IntVector2>(); // for debug
+	var angle = 0.0;
 }
 
 class Item extends Entity {

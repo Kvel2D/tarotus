@@ -19,6 +19,7 @@ enum CardType {
     CardType_None;
     CardType_Dude;
     CardType_Treasure;
+    CardType_Weapon;
     CardType_Nothing;
 }
 
@@ -57,7 +58,8 @@ class Game {
     static inline var ARROW_HACK = false;
     static inline var DRAW_LOS_DEBUG = false;
 
-    static var default_item_type = ItemType_Weapon;
+    static var default_card_type = null;
+    static var default_item_type = null;
     static var default_weapon_type = null;
     static var default_armor_type = null;
     static var default_consumable_type = null;
@@ -74,7 +76,7 @@ class Game {
     static inline var inventory_y = 64;
     static inline var inventory_slot_size = 64;
     static inline var trash_x = inventory_x;
-    static inline var trash_y = inventory_y + inventory_slot_size * inventory_slots + 20;
+    static inline var trash_y = inventory_y + inventory_slot_size * inventory_slots + 10;
 
     var state = GameState_PlayerTurn;
     var state_timer = 0; // reset to 0 by state at completion
@@ -91,7 +93,7 @@ class Game {
     var message_text = "";
     var message_time_left = 0;
     static inline var message_x = inventory_x;
-    static inline var message_y = 420;
+    static inline var message_y = trash_y + inventory_slot_size + 10;
     static var message_fade_length = 180;
 
     var walls = Data.bool_2dvector(map_width, map_height);
@@ -137,9 +139,11 @@ class Game {
 
     function random_card_type():Dynamic {
         var k = Random.int(1, 100);
-        if (k <= 30) {
+        if (k <= 10) {
+            return CardType_Weapon;
+        } else if (k <= 30) {
             return CardType_Treasure;
-        } else if (k <= 50) {
+        } else if (k <= 60) {
             return CardType_Nothing;
         } else {
             return CardType_Dude;
@@ -168,6 +172,10 @@ class Game {
                 cards[i][j].y = j;
                 // NOTE: watch out for when you add more card types that should not be rare
                 cards[i][j].type = random_card_type();
+                cards[i][j].type = random_card_type();
+                if (default_card_type != null) {
+                    cards[i][j].type = default_card_type;
+                }
                 cards[i][j].covered = true;
             }
         }
@@ -350,15 +358,19 @@ class Game {
             walls[dude.x][dude.y] = false;
             update_dude_info(dude);
 
-            dude.hp_max = card_level;
+            dude.hp_max = card_level * 2;
             dude.hp = dude.hp_max;
-        } else if (card.type == CardType_Treasure) {
+        } else if (card.type == CardType_Treasure || card.type == CardType_Weapon) {
             // Spawn random item
             var item = new Item();
             var free_cell = random_cell_in_card(card.x, card.y, function(x, y) { return !walls[x][y]; });
             item.x = free_cell.x;
             item.y = free_cell.y;
-            item.type = random_enum(ItemType, 1);
+            if (card.type == CardType_Weapon) {
+                item.type = ItemType_Weapon;
+            } else {
+                item.type = random_enum(ItemType, 2);
+            }
 
             if (default_item_type != null) {
                 item.type = default_item_type;
@@ -608,8 +620,17 @@ class Game {
         Gfx.rotation(0); 
 
         for (dude in Entity.get(Dude)) {
+            if (dude.angle != 0 && !dude.hit) {
+                if (Math.abs(dude.angle) < 0.1) {
+                    dude.angle = 0;
+                } else {
+                    dude.angle = Math.lerp(dude.angle, 0, 0.4);
+                }
+            }
+            Gfx.rotation(dude.angle); 
+            Gfx.draw_tile(dude.real_x, dude.real_y, Tiles.Dude);
+            Gfx.rotation(0); 
             if (!dude.dead) {
-                Gfx.draw_tile(dude.real_x, dude.real_y, Tiles.Dude);
                 Text.display(dude.real_x, dude.real_y, '${dude.hp}/${dude.hp_max}', Col.WHITE);
             }
         }
@@ -625,6 +646,7 @@ class Game {
                         case CardType_Nothing: card_color = Col.BLUE;
                         case CardType_Dude: card_color = Col.RED;
                         case CardType_Treasure: card_color = Col.YELLOW;
+                        case CardType_Weapon: card_color = Col.GREEN;
                         case CardType_None: card_color = Col.PINK;
                     }
                     if (DRAW_IMAGE_COVER) {
@@ -653,7 +675,7 @@ class Game {
         Text.display(inventory_x, 30, '${state}');
 
         Text.display(inventory_x, 500, 'Health: ${player.hp}');
-        Text.display(inventory_x, 540, 'Armor: ${player.armor}');
+        Text.display(inventory_x, 530, 'Armor: ${player.armor}');
         Text.display(inventory_x, 600, hover_info);
 
         if (message_time_left > 0) {
@@ -894,31 +916,33 @@ class Game {
             }
 
             if (player.dx != 0 || player.dy != 0) {
-                var can_attack = true;
 
                 if (player.weapon == WeaponType_Bow) {
-                    var have_arrows = false;
+                    var arrows_min: Item = null;
+                    var arrows_min_slot = 0;
+                    var arrows_min_amount = 100000;
                     for (i in 0...inventory.length) {
                         if (inventory[i] != null && inventory[i].type == ItemType_Arrows) {
-                            have_arrows = true;
-                            inventory[i].amount--;
-                            if (inventory[i].amount == 0) {
-                                inventory[i] = null;
+                            if (inventory[i].amount < arrows_min_amount) {
+                                arrows_min = inventory[i];
+                                arrows_min_slot = i;
+                                arrows_min_amount = inventory[i].amount;
                             }
-                            break;
                         }
                     }
-                    if (!have_arrows) {
-                        can_attack = false;
-                        make_message("No arrows in inventory");
+
+                    if (arrows_min != null) {
+                        arrows_min.amount--;
+                        if (arrows_min.amount == 0) {
+                            inventory[arrows_min_slot] = null;
+                            arrows_min.delete();
+                        }
                     }
                 }
 
-                if (can_attack) {
-                    state = GameState_PlayerVisual;
-                    player.attacked = true;
-                    player.moved = false;
-                }
+                state = GameState_PlayerVisual;
+                player.attacked = true;
+                player.moved = false;
             }
         }
 
@@ -1072,7 +1096,7 @@ class Game {
                             }
 
                             if (!open_slot_found) {
-                                //TODO: add a "no free space" message here
+                                make_message("Inventory is full");
                             }
                         }
                     }
@@ -1143,7 +1167,12 @@ class Game {
                             }
                         }
                         return false;
-                    }();
+                    }
+
+                    var drop_success = drop_item();
+                    if (!drop_success) {
+                        make_message("Not enough space to drop item");
+                    }
                 }
             }
         }
@@ -1442,19 +1471,15 @@ class Game {
                 if (dude.active) {
                     for (cell in hit_cells) {
                         if (dude.x == cell.x && dude.y == cell.y) {
-                            hit_dude = dude;
+                            dude.hp -= attack_damage;
+                            if (dude.hp <= 0) {
+                                dude.dead = true;
+                            } else {
+                                dude.hit = true;
+                            }
                             break;
                         }
                     }
-                    if (hit_dude != null) {
-                        break;
-                    }
-                }
-            }
-            if (hit_dude != null) {
-                hit_dude.hp -= attack_damage;
-                if (hit_dude.hp <= 0) {
-                    hit_dude.dead = true;
                 }
             }
         }
@@ -1558,10 +1583,13 @@ class Game {
         render();
 
         for (dude in Entity.get(Dude)) {
-            if (dude.dead) {
-                Gfx.rotation(20 * state_timer / move_visual_timer_max);
-                Gfx.draw_tile(dude.real_x, dude.real_y, Tiles.Dude);
-                Gfx.rotation(0);
+            if (dude.hit) {
+                dude.angle = -Math.sin(state_timer / 2) * 15;
+                if (state_timer < weapon_visual_timer_max) {
+                    all_visuals_completed = false;
+                }
+            } else if (dude.dead) {
+                dude.angle = 20 * state_timer / move_visual_timer_max;
                 if (state_timer < move_visual_timer_max) {
                     all_visuals_completed = false;
                 }
@@ -1577,7 +1605,7 @@ class Game {
         }
 
         if (player.hit) {
-            player.angle = Math.sin(state_timer / 2) * 15; // slow it down
+            player.angle = Math.sin(state_timer / 2) * 15;
         }
 
 
@@ -1587,6 +1615,9 @@ class Game {
             state_timer = 0;
 
             player.hit = false;
+            for (dude in Entity.get(Dude)) {
+                dude.hit = false;
+            }
         }
     }
 
@@ -1737,6 +1768,9 @@ class Game {
 
                     card_update_timer = card_update_timer_max;
                     updated_card.type = random_card_type();
+                    if (default_card_type != null) {
+                        updated_card.type = default_card_type;
+                    }
                     updated_card.covered = true;
                     generate_card(updated_card);
                     updated_card.level = card_level;
