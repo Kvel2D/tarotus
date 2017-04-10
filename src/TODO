@@ -1,11 +1,11 @@
 
 more items
-limit number of each type of card
 do make an experience system, levels raise your max health/mana, stats, stats are needed for weapons
 if im gonna make an exp system, there's a gotta be a way to miss out on enemies/exp
 think through update system
 
 DONE:
+
 
 
 ---------------------------------------------------------------------------------------------------
@@ -22,12 +22,38 @@ card magic
 ---------------------------------------------------------------------------------------------------
 IDEAS
 ---------------------------------------------------------------------------------------------------
+
+card magic is activated by stepping onto center of arcana card
+no description is given until after you step
+
+CARD MAGIC
+0FOOL        next 5 cards are nothing 
+1MAGICIAN    reroll all covered cards(doesnt advance level counter) 
+2PRIESTESS   heals you to max health/increases your max health 
+3EMPRESS     card update accelerates
+4EMPEROR     adds dmg to current weapon
+5HIEROPHANT  repairs all your armor
+6LOVERS      enemies become friendly for 13 turns 
+7CHARIOT     removes all walls from uncovered cards
+8JUSTICE     
+9HERMIT      remove all dudes
+10FORTUNE    
+11STRENGTH   next 5 cards are weapon cards
+12HANGED MAN transport player onto any card 
+11JUSTICE    recover all uncovered cards(doesnt advance level counter) 
+13DEATH      next 5 cards are dude cards 
+17STAR       next 5 cards are treasure cards 
+19SUN 		 see what cards contain for 10 turns
+
+
+
+
+
 charging enemy, can only be hit from the back
 
 stamina system
 
 20 arcana bosses might be too much, maybe make arcanas into spells/abilities and make kings/queens bosses
-add attack controls for mouse too(going full WASD + mouse might be better)
 dudes that just block the way and don't attack(but do move)
 generate presets by generating a dungeon completely first and then breaking it down into elements
 
@@ -49,6 +75,7 @@ maybe make a specific weapon slot, and allow more weapons to be carried in inven
 but this might be a reasonable tradeoff for how powerful bow is, balance out with more opportunities for weapon replacement
 
 CARD TYPES
+to make sure there isn't too many or too little of one card type, keep track of spawned types for past 15 cards
 nothing card spawns some walls
 dude card spawns some dudes then walls
 treasure card spawns treasure then walls

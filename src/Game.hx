@@ -106,29 +106,10 @@ class Game {
     static inline var card_level_increment_timer_min = 5;
     static inline var card_level_increment_timer_max = 8;
     var card_level_increment_timer = Random.int(card_level_increment_timer_min, card_level_increment_timer_max);
+    var card_type_history = new Array<CardType>();
 
     var player:Player;
-
     var inventory = new Vector<Item>(inventory_slots);
-
-    var card_a = [
-    [false, false, false, false, false],
-    [false, false, true, false, false],
-    [false, false, false, false, false],
-    ];
-
-    var card_b = [
-    [false, true, false, false, false],
-    [false, false, false, false, false],
-    [false, false, false, true, false],
-    ];
-
-    var card_c = [
-    [false, true, false, false, false],
-    [false, false, false, false, false],
-    [false, true, false, true, false],
-    ];
-
     var history = new Array<Array<String>>();
 
     // start_index is used to skip EnumType_None
@@ -137,17 +118,80 @@ class Game {
         return Type.allEnums(enum_type)[k];
     }
 
+
+    var type_chances_default = [
+    CardType_None => 0,
+    CardType_Weapon => 10,
+    CardType_Treasure => 30,
+    CardType_Dude => 40,
+    CardType_Nothing => 20,
+    ];
+    // Max and min per 15 cards
+    var type_max = [
+    CardType_None => 0 / 15,
+    CardType_Weapon => 3 / 15,
+    CardType_Treasure => 4 / 15,
+    CardType_Dude => 8 / 15,
+    CardType_Nothing => 4 / 15,
+    ];
+    var type_min = [
+    CardType_None => 0 / 15,
+    CardType_Weapon => 1 / 15,
+    CardType_Treasure => 1 / 15,
+    CardType_Dude => 3 / 15,
+    CardType_Nothing => 1 / 15,
+    ];
     function random_card_type():Dynamic {
-        var k = Random.int(1, 100);
-        if (k <= 10) {
-            return CardType_Weapon;
-        } else if (k <= 30) {
-            return CardType_Treasure;
-        } else if (k <= 60) {
-            return CardType_Nothing;
-        } else {
-            return CardType_Dude;
+        var card_types = Type.allEnums(CardType);
+        var type_chances = new Map<CardType, Int>();
+        for (type in card_types) {
+            type_chances[type] = type_chances_default[type];
         }
+
+        var type_counts = new Map<CardType, Int>();
+        for (i in 0...card_types.length) {
+            type_counts.set(card_types[i], 0);
+        }
+        for (card_type in card_type_history) {
+            type_counts[card_type] = type_counts[card_type] + 1;
+        }
+
+        for (card_type in card_types) {
+            if (card_type != CardType_None) {
+                // If there are too many cards of type, halve the chances
+                if (type_counts[card_type] / card_type_history.length > type_max[card_type]) {
+                    type_chances[card_type] = Std.int(type_chances[card_type] / 2);
+                }
+                // If there are too little cards of type, double the chances
+                if (type_counts[card_type] / card_type_history.length < type_min[card_type]) {
+                    type_chances[card_type] = type_chances[card_type] * 2;
+                }
+            }
+        }
+
+        var chances_incremented = new Vector<Int>(card_types.length);
+        chances_incremented[0] = type_chances[card_types[0]];
+        var chance_sum = 0;
+        for (i in 1...card_types.length) {
+            chance_sum += type_chances[card_types[i]];
+            chances_incremented[i] = chance_sum; 
+        }
+
+        var k = Random.int(0, chance_sum);
+        var type: CardType = null;
+        for (i in 0...card_types.length) {
+            if (k <= chances_incremented[i]) {
+                type = card_types[i];
+                break;
+            }
+        }
+
+        card_type_history.insert(0, type);
+        if (card_type_history.length > 15) {
+            card_type_history.pop();
+        }
+
+        return type;
     }
 
     function new() {
@@ -171,7 +215,6 @@ class Game {
                 cards[i][j].x = i;
                 cards[i][j].y = j;
                 // NOTE: watch out for when you add more card types that should not be rare
-                cards[i][j].type = random_card_type();
                 cards[i][j].type = random_card_type();
                 if (default_card_type != null) {
                     cards[i][j].type = default_card_type;
@@ -1905,5 +1948,13 @@ class Game {
         }
 
         GUI.enum_setter(1000, 800, function(x) { player.weapon = x; }, player.weapon, WeaponType);
+
+        GUI.x = 1000;
+        GUI.y = 600;
+        GUI.auto_text_button("magic", function() { do_magic(); });
+    }
+
+    function do_magic() {
+
     }
 }
