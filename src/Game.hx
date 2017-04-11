@@ -20,6 +20,7 @@ enum CardType {
     CardType_Dude;
     CardType_Treasure;
     CardType_Weapon;
+    CardType_Magic;
     CardType_Nothing;
 }
 
@@ -27,7 +28,9 @@ enum CardType {
 class Card {
     var type = CardType_None;
     var covered = false;
-    var age = 0;
+    var visited = false;
+    var turn_age = 0;
+    var update_age = 0;
     var x = 0;
     var y = 0;
     var level = 0;
@@ -107,6 +110,7 @@ class Game {
     static inline var card_level_increment_timer_max = 8;
     var card_level_increment_timer = Random.int(card_level_increment_timer_min, card_level_increment_timer_max);
     var card_type_history = new Array<CardType>();
+    static inline var too_old_age = 30;
 
     var player:Player;
     var inventory = new Vector<Item>(inventory_slots);
@@ -123,23 +127,23 @@ class Game {
     CardType_None => 0,
     CardType_Weapon => 10,
     CardType_Treasure => 30,
-    CardType_Dude => 40,
-    CardType_Nothing => 20,
+    CardType_Dude => 20,
+    CardType_Nothing => 40,
     ];
     // Max and min per 15 cards
     var type_max = [
     CardType_None => 0 / 15,
     CardType_Weapon => 3 / 15,
     CardType_Treasure => 4 / 15,
-    CardType_Dude => 8 / 15,
-    CardType_Nothing => 4 / 15,
+    CardType_Dude => 4 / 15,
+    CardType_Nothing => 8 / 15,
     ];
     var type_min = [
     CardType_None => 0 / 15,
     CardType_Weapon => 1 / 15,
     CardType_Treasure => 1 / 15,
-    CardType_Dude => 3 / 15,
-    CardType_Nothing => 1 / 15,
+    CardType_Dude => 1 / 15,
+    CardType_Nothing => 3 / 15,
     ];
     function random_card_type():Dynamic {
         var card_types = Type.allEnums(CardType);
@@ -189,6 +193,10 @@ class Game {
         card_type_history.insert(0, type);
         if (card_type_history.length > 15) {
             card_type_history.pop();
+        }
+
+        if (Random.chance(10)) {
+            type = CardType_Magic;
         }
 
         return type;
@@ -320,7 +328,7 @@ class Game {
         var walls_preset = Walls.all[k];
         for (i in 0...card_width) {
             for (j in 0...card_height) {
-                walls[card.x * card_width + i][card.y * card_height + j] = (walls_preset[i][j] == 1);
+                walls[card.x * card_width + i][card.y * card_height + j] = (walls_preset[j][i] == 1);
             }
         }
 
@@ -362,8 +370,14 @@ class Game {
         // TODO: current generation can still produce unreachable cells
         // Check for paths here and delete walls randomly until there's a path
         // from player to every free cell on card
+        var max_loops = card_width * card_height;
         var path_exists = false;
+        var loop_number = 0;
         while (!path_exists) {
+            if (loop_number > max_loops) {
+                break;
+            }
+
             path_exists = true;
 
             for (i in 0...card_width) {
@@ -387,6 +401,8 @@ class Game {
                 var random_wall = random_cell_in_card(card.x, card.y, function(x, y) { return walls[x][y]; });
                 walls[random_wall.x][random_wall.y] = false;
             }
+            
+            loop_number++;
         }
 
         //TODO: make a better formula for item and dude values based on card level(currently simply linear)
@@ -686,11 +702,12 @@ class Game {
                 if (cards[x][y].covered) {
                     var card_color = 0;
                     switch (cards[x][y].type) {
-                        case CardType_Nothing: card_color = Col.BLUE;
+                        case CardType_Nothing: card_color = Col.YELLOW;
                         case CardType_Dude: card_color = Col.RED;
-                        case CardType_Treasure: card_color = Col.YELLOW;
+                        case CardType_Treasure: card_color = Col.BLUE;
                         case CardType_Weapon: card_color = Col.GREEN;
-                        case CardType_None: card_color = Col.PINK;
+                        case CardType_Magic: card_color = Col.DARKGREEN;
+                        case CardType_None: card_color = Col.BLACK;
                     }
                     if (DRAW_IMAGE_COVER) {
                         Gfx.draw_image(x * card_width * tilesize, y * card_height * tilesize, "card");
@@ -808,12 +825,11 @@ class Game {
         }
     }
 
+    function card_at_position(x:Int, y:Int):IntVector2 {
+        return {x: Std.int(x / card_width), y: Std.int(y / card_height)};
+    }
+
     function update_player_turn() {
-
-        function card_at_position(x:Int, y:Int):IntVector2 {
-            return {x: Std.int(x / card_width), y: Std.int(y / card_height)};
-        }
-
         //
         // MOVEMENT
         //
@@ -1437,8 +1453,8 @@ class Game {
                     var tri = [0, tilesize / 16, 0, -tilesize / 16, tilesize / 4, 0];
                     Math.rotate_vertices(tri, 0, 0, angle);
                     Math.translate_vertices(tri, 
-                        (player.x + 0.5) * tilesize + player.dx * attack_progress * attack_dst,
-                        (player.y + 0.5) * tilesize + player.dy * attack_progress * attack_dst);
+                        (player.x + 0.5) * tilesize + player.dx * state_timer / timer_max * attack_dst,
+                        (player.y + 0.5) * tilesize + player.dy * state_timer / timer_max * attack_dst);
                     Gfx.fill_tri_array(tri, Col.RED);
 
                     // Stop at wall
@@ -1605,6 +1621,10 @@ class Game {
             update_dude_info(dude);
         }
 
+        // Set card that has player to complete
+        var card_with_player = card_at_position(player.x, player.y);
+        cards[card_with_player.x][card_with_player.y].visited = true;
+
         render();
 
         state = GameState_EnemyVisual;
@@ -1733,7 +1753,7 @@ class Game {
         for (x in 0...cardmap_width) {
             for (y in 0...cardmap_height) {
                 if (!cards[x][y].covered) {
-                    cards[x][y].age++;
+                    cards[x][y].turn_age++;
                 }
             }
         }
@@ -1760,7 +1780,7 @@ class Game {
                         }
                     }
                 }
-                card_queue.sort(function(x, y) {return y.age - x.age;});
+                card_queue.sort(function(x, y) {return y.turn_age - x.turn_age;});
 
                 function is_empty(card:Card) {
                     if (Std.int(player.x / card_width) == card.x && Std.int(player.y / card_height) == card.y) {
@@ -1775,13 +1795,16 @@ class Game {
                 }
 
                 function is_completed(card:Card) {
-                    // TODO: add check for treasure cards, boss cards, etc.
+                    // TODO: add specific checks for treasure cards, boss cards, etc.
+                    if (!card.visited) {
+                        return false;
+                    }
                     return true;
                 }
 
                 var updated_card:Card = null;
                 for (card in card_queue) {
-                    if (is_empty(card) && is_completed(card)) {
+                    if (is_empty(card) && is_completed(card) || card.update_age > too_old_age) {
                         updated_card = card;
                         break;
                     }
@@ -1824,6 +1847,12 @@ class Game {
                         card_level++;
                         card_level_increment_timer = Random.int(card_level_increment_timer_min, card_level_increment_timer_max); 
                     }
+
+                    for (x in 0...cardmap_width) {
+                    for (y in 0...cardmap_height) {
+                        cards[x][y].update_age++;
+                    }
+                }
                 }
             }
         }

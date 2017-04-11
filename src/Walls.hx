@@ -195,20 +195,20 @@ class Walls {
 
 	static function generate() {
 		for (preset in unmixed) {
-			all.push(preset);
-			var horizontal = reflect_horizontal(preset);
-			if (!same(horizontal, preset)) {
-				all.push(horizontal);
-			}
+			all.push(reflect_vertical(preset));
+			// var horizontal = reflect_horizontal(preset);
+			// if (!same(horizontal, preset)) {
+			// 	all.push(horizontal);
+			// }
 
-			var vertical = reflect_vertical(preset);
-			if (!same(vertical, preset)) {
-				all.push(vertical);
-			}
-			var vertical_horizontal = reflect_horizontal(vertical);
-			if (!same(vertical_horizontal, vertical)) {
-				all.push(vertical_horizontal);
-			}
+			// var vertical = reflect_vertical(preset);
+			// if (!same(vertical, preset)) {
+			// 	all.push(vertical);
+			// }
+			// var vertical_horizontal = reflect_horizontal(vertical);
+			// if (!same(vertical_horizontal, vertical)) {
+			// 	all.push(vertical_horizontal);
+			// }
 		}
 	}
 }
