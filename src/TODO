@@ -1,5 +1,6 @@
+implement some arcana's
 
-make items/armor more rare
+make items/armor more rare and crappier at the start
 more items
 do make an experience system, levels raise your max health/mana, stats, stats improve weapons
 
@@ -33,19 +34,19 @@ CARD MAGIC
 5HIEROPHANT  repairs all your armor
 6LOVERS      enemies become friendly for 13 turns 
 7CHARIOT     removes all walls from uncovered cards
-8STRENGTH   next 5 cards are weapon cards
+8STRENGTH    next 5 cards are weapon cards
 9HERMIT      remove all dudes
-10FORTUNE    
+10FORTUNE    double amount of money from dudes
 11JUSTICE    recover all uncovered cards(doesnt advance level counter) 
 12HANGED MAN transport player onto any card 
-
 13DEATH      next 5 cards are dude cards 
-
-
-
+14TEMPERANCE
+15DEVIL
+16TOWER
 17STAR       next 5 cards are treasure cards 
-
+18MOON
 19SUN 		 see what cards contain for 10 turns
+20JUDGEMENT
 
 
 

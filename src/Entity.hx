@@ -12,6 +12,7 @@ enum ItemType {
 	ItemType_Armor;
 	ItemType_Consumable;
 	ItemType_Arrows;
+	ItemType_Bomb;
 }
 
 enum ConsumableType {
