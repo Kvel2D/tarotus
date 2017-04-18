@@ -1,11 +1,17 @@
 implement all arcanas
-complete hermit card(insert reset_card())
+test all arcanas
+find out what's up with empty dark blue cards
+implement completed dude cards spawning treasure cards mechanic
+implement checking for dude cards completeness
+maybe add a dude card complete visual
 
+card cover/uncover/replace animations
 make items/armor more rare and crappier at the start
 more items
 do make an experience system, levels raise your max health/mana, stats, stats improve weapons
 
 DONE:
+
 
 
 ---------------------------------------------------------------------------------------------------
@@ -22,55 +28,47 @@ card magic
 ---------------------------------------------------------------------------------------------------
 IDEAS
 ---------------------------------------------------------------------------------------------------
-
-card magic is activated by stepping onto center of arcana card
-no description is given until after you step
-
-CARD MAGIC
-0FOOL        next 5 cards are nothing 
-1MAGICIAN    reroll all covered cards(doesnt advance level counter) 
-2PRIESTESS   heals you to max health/increases your max health 
-3EMPRESS     card update accelerates for the next 10 cards
-4EMPEROR     adds dmg to current weapon
-5HIEROPHANT  repairs all your armor
-6LOVERS      enemies become friendly for 13 turns 
-7CHARIOT     removes all walls from uncovered cards
-8STRENGTH    next 5 cards are weapon cards
-9HERMIT      remove all dudes
-10FORTUNE    double amount of money from dudes
-11JUSTICE    recover all uncovered cards(doesnt advance level counter) 
-12HANGED MAN transport player onto any card 
-13DEATH      next 5 cards are dude cards 
-14TEMPERANCE
-15DEVIL
-16TOWER
-17STAR       next 5 cards are treasure cards 
-18MOON
-19SUN 		 see what cards contain for 10 turns
-20JUDGEMENT
-
-
-
-
+make enemy cards spawn treasure cards on completion
 
 charging enemy, can only be hit from the back
 
-stamina system
+laser weapons: powerful, no ammo, but take time to recharge
 
 20 arcana bosses might be too much, maybe make arcanas into spells/abilities and make kings/queens bosses
 dudes that just block the way and don't attack(but do move)
 generate presets by generating a dungeon completely first and then breaking it down into elements
 
-powerful weapons take an extra turn to use
-
-fix unreachable cells, a better way might be to do a pass after all cards are generated and then do a full pass everytime a new card is generated
-
 shop
+
 break down weapons into materials, use materials at a blacksmith
 
 ---------------------------------------------------------------------------------------------------
 NOTES
 ---------------------------------------------------------------------------------------------------
+
+
+CARD MAGIC
+*0FOOL        next 5 cards are nothing 
+*1MAGICIAN    reroll all covered cards(doesnt advance level counter) 
+*2PRIESTESS   heals you to max health/increases your max health 
+*3EMPRESS     card update accelerates for the next 10 cards
+*4EMPEROR     adds dmg to current weapon
+*5HIEROPHANT  repairs all your armor
+*6LOVERS      enemies become friendly for 13 turns 
+*7CHARIOT     removes all walls from uncovered cards
+*8STRENGTH    next 5 cards are weapon cards
+*9HERMIT      remove all dudes
+10FORTUNE    double amount of money from dudes
+*11JUSTICE    recover all uncovered cards(doesnt advance level counter) 
+*12HANGED MAN transport player onto any card 
+*13DEATH      next 5 cards are dude cards 
+*14TEMPERANCE treasure/weapon cards have a chance of having an extra item for next 5 treasure cards
+15DEVIL
+16TOWER
+*17STAR       next 5 cards are treasure cards 
+18MOON
+*19SUN 		 see what cards contain for 10 turns
+20JUDGEMENT
 
 WEAPON SLOT
 currently only one weapon can be in inventory at a time
