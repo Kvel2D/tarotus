@@ -1,4 +1,5 @@
-implement some arcana's
+implement all arcanas
+complete hermit card(insert reset_card())
 
 make items/armor more rare and crappier at the start
 more items
@@ -29,7 +30,7 @@ CARD MAGIC
 0FOOL        next 5 cards are nothing 
 1MAGICIAN    reroll all covered cards(doesnt advance level counter) 
 2PRIESTESS   heals you to max health/increases your max health 
-3EMPRESS     card update accelerates
+3EMPRESS     card update accelerates for the next 10 cards
 4EMPEROR     adds dmg to current weapon
 5HIEROPHANT  repairs all your armor
 6LOVERS      enemies become friendly for 13 turns 

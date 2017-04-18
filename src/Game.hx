@@ -121,10 +121,13 @@ class Game {
     var dragged_item_inventory_slot = 0;
     var hover_info = "";
     var message_text = "";
-    var message_time_left = 0;
-    static inline var message_x = inventory_x;
-    static inline var message_y = trash_y + inventory_slot_size + 10;
-    static var message_fade_length = 180;
+    var message_timer = 0;
+    static inline var message_x = map_width * tilesize / 2;
+    static inline var message_y = (map_height - 1) * tilesize;
+    static var message_timer_max = 180;
+    var explosion_x = 0;
+    var explosion_y = 0;
+    var explosion_happened = false;
 
     var walls = Data.bool_2dvector(map_width, map_height);
     var cards = new Vector<Vector<Card>>(cardmap_width);
@@ -142,6 +145,10 @@ class Game {
     var player:Player;
     var inventory = new Vector<Item>(inventory_slots);
     var history = new Array<Array<String>>();
+
+
+    var force_card_type = CardType_None;
+    var force_cards_left = 0;
 
     function new() {
         Walls.generate();
@@ -279,6 +286,13 @@ class Game {
             }
         }
 
+        // Force card type(arcana card effect)
+        if (force_cards_left > 0) {
+            force_cards_left--;
+            type = force_card_type;
+        }
+
+
         card_type_history.insert(0, type);
         if (card_type_history.length > 15) {
             card_type_history.pop();
@@ -290,35 +304,67 @@ class Game {
     function do_arcana_magic(type: ArcanaType) {
         switch (type) {
             case ArcanaType_None:
-            case ArcanaType_Fool:
-            case ArcanaType_Magician:
+
+            case ArcanaType_Fool: {
+                make_message("Next 5 cards are nothing");
+                force_card_type = CardType_Nothing;
+                force_cards_left = 5;
+            }
+            case ArcanaType_Strength: {
+                make_message("Next 5 cards are weapon");
+                force_card_type = CardType_Weapon;
+                force_cards_left = 5;
+            }
+            case ArcanaType_Death: {
+                make_message("Next 5 cards are dude");
+                force_card_type = CardType_Dude;
+                force_cards_left = 5;
+            }
+            case ArcanaType_Star: {
+                make_message("Next 5 cards are treasure");
+                force_card_type = CardType_Treasure;
+                force_cards_left = 5;
+            }
+
+            case ArcanaType_Hermit: {
+                make_message("All enemies are removed");
+                for (dude in Entity.get(Dude)) {
+                    if (dude.active) {
+                        dude.delete();
+                    }
+                }
+            }
+            case ArcanaType_Magician: {
+                make_message("All covered cards have been replaced");
+                for (x in 0...cardmap_width) {
+                    for(y in 0...cardmap_height) {
+
+                    }
+                }
+            }
             case ArcanaType_Priestess:
             case ArcanaType_Empress:
             case ArcanaType_Emperor:
             case ArcanaType_Hierophant:
             case ArcanaType_Lovers:
             case ArcanaType_Chariot:
-            case ArcanaType_Strength:
-            case ArcanaType_Hermit:
             case ArcanaType_Fortune:
             case ArcanaType_Justice:
             case ArcanaType_HangedMan:
-            case ArcanaType_Death:
             case ArcanaType_Temperance:
             case ArcanaType_Devil:
             case ArcanaType_Tower:
-            case ArcanaType_Star:
             case ArcanaType_Moon:
             case ArcanaType_Sun:
             case ArcanaType_Judgement:
-            default: trace("unhandled case in do_arcana_magic");
+            default: trace("unhandled case in do_arcana_magic()");
         }
         trace(type);
     }
 
     function make_message(text: String) {
         message_text = text;
-        message_time_left = message_fade_length * 2;
+        message_timer = message_timer_max;
     }
 
     function update_dude_info(dude: Dude) {
@@ -376,6 +422,34 @@ class Game {
                 Reflect.setField(entity, pair[0], pair[1]);
             }
         }
+    }
+
+    function reset_card(card: Card) {
+        // Remove items on card
+        var removed_items = new Array<Item>();
+        for (item in Entity.get(Item)) {
+            if (item.on_ground && Std.int(item.x / card_width) == updated_card.x && Std.int(item.y / card_height) == updated_card.y) {
+                removed_items.push(item);
+            }
+        }
+        for (item in removed_items) {
+            item.delete();
+        }
+        // Remove dudes on card
+        var removed_dudes = new Array<Item>();
+        for (dude in Entity.get(Dude)) {
+            if (Std.int(dude.x / card_width) == updated_card.x && Std.int(dude.y / card_height) == updated_card.y) {
+                removed_dudes.push(dude);
+            }
+        }
+        for (dude in removed_dudes) {
+            dude.delete();
+        }
+        updated_card.covered = true;
+        updated_card.visited = false;
+        updated_card.arcana_activated = false;
+        updated_card.turn_age = 0;
+        updated_card.update_age = 0;
     }
 
     function generate_card(card:Card) {
@@ -812,17 +886,28 @@ class Game {
         Text.display(inventory_x, 530, 'Armor: ${player.armor}');
         Text.display(inventory_x, 600, hover_info);
 
-        if (message_time_left > 0) {
-            if (Math.point_box_intersect(Mouse.x, Mouse.y, message_x, message_y, Text.width(message_text), Text.height())) {
-                message_time_left = Std.int(message_fade_length * 1.5);
-            }
-            message_time_left--;
-            if (message_time_left > message_fade_length) {
-                Text.display(message_x, message_y, message_text);
+        if (message_timer > 0) {
+            message_timer--;
+
+            var size = Text.currentsize;
+            var new_size: Float;
+            if (message_timer > message_timer_max * 0.95) {
+                new_size = Math.lerp(size * 0.5, size * 2.5, (message_timer_max - message_timer) / (message_timer_max * 0.05));
             } else {
-                var c = Std.int(message_time_left / message_fade_length * 255);
-                Text.display(message_x, message_y, message_text, Col.rgb(c, c, c));
+                new_size = size * 2.5;
             }
+            Text.change_size(new_size);
+
+            var x = message_x - Text.width(message_text) / 2;
+            var y = message_y - Text.height() / 2;
+
+            if (message_timer > message_timer_max * 0.3) {
+                Text.display(x, y, message_text);
+            } else {
+                var c = Std.int(message_timer / message_timer_max / 0.3 * 255);
+                Text.display(x, y, message_text, Col.rgb(c, c, c));
+            }
+            Text.change_size(size);
         }
 
         if (DRAW_LOS_DEBUG) {
@@ -1321,6 +1406,7 @@ class Game {
             var put_in_inventory = false;
             var put_in_trash = false;
             var slot_index = -1;
+            var explosion = false;
 
             if (Math.point_box_intersect(Mouse.x, Mouse.y, trash_x, trash_y, inventory_slot_size, inventory_slot_size)) {
                 // Trash item
@@ -1402,12 +1488,35 @@ class Game {
             } else if (!put_in_trash) {
                 var drop_x = Std.int(Mouse.x / tilesize);
                 var drop_y = Std.int(Mouse.y / tilesize);
-                var can_drop = !out_of_bounds(drop_x, drop_y) 
-                && Math.abs(drop_x - player.x) < 2 
-                && Math.abs(drop_y - player.y) < 2;
-                // Bombs are dropped on walls to be activated
-                if (dragged_item.type != ItemType_Bomb && walls[drop_x][drop_y]) {
-                    can_drop = false;
+
+                var dropped_on_dude = false;
+                for (dude in Entity.get(Dude)) {
+                    if (dude.active && dude.x == drop_x && dude.y == drop_y) {
+                        dropped_on_dude = true;
+                        break;
+                    }
+                }
+
+                var can_drop: Bool;
+                if (dragged_item.type == ItemType_Bomb) {
+                    // Bombs can be dropped on walls and enemies
+                    can_drop = !out_of_bounds(drop_x, drop_y) 
+                    && Math.abs(drop_x - player.x) < 2 
+                    && Math.abs(drop_y - player.y) < 2;
+
+                    if (walls[drop_x][drop_y] || dropped_on_dude) {
+                        explosion = true;
+                    }
+                } else {
+                    can_drop = !out_of_bounds(drop_x, drop_y) 
+                    && Math.abs(drop_x - player.x) < 2 
+                    && Math.abs(drop_y - player.y) < 2
+                    && !walls[drop_x][drop_y]
+                    && !dropped_on_dude;
+                }
+
+                if (!can_drop) {
+                    make_message("You can't drop the item there!");
                 }
 
                 function try_consume(item) {
@@ -1421,6 +1530,15 @@ class Game {
                 }
                 function blow_up(item) {
                     walls[item.x][item.y] = false;
+                    for (dude in Entity.get(Dude)) {
+                        if (dude.active && dude.x == drop_x && dude.y == drop_y) {
+                            dude.blown = true;
+                            break;
+                        }
+                    }
+                    explosion_happened = true;
+                    explosion_x = drop_x;
+                    explosion_y = drop_y;
                     item.delete();
                 }
 
@@ -1456,7 +1574,11 @@ class Game {
 
 
             dragged_item = null;
-            state = GameState_PlayerTurn;
+            if (explosion) {
+                state = GameState_PlayerVisual;
+            } else {
+                state = GameState_PlayerTurn;
+            }
         }
 
         render();
@@ -1629,6 +1751,17 @@ class Game {
                 }
             }
         }
+        // "Attack" dudes that were hit with a bomb
+        for (dude in Entity.get(Dude)) {
+            if (dude.blown) {
+                dude.hp -= 5;
+                if (dude.hp <= 0) {
+                    dude.dead = true;
+                } else {
+                    dude.hit = true;
+                }
+            }
+        }
         player.moved = false;
         player.attacked = false;
         player.dx = 0;
@@ -1735,13 +1868,7 @@ class Game {
                 if (state_timer < move_visual_timer_max) {
                     all_visuals_completed = false;
                 }
-            }
-        }
-
-        render();
-
-        for (dude in Entity.get(Dude)) {
-            if (dude.hit) {
+            } else if (dude.hit) {
                 dude.angle = -Math.sin(state_timer / 2) * 15;
                 if (state_timer < weapon_visual_timer_max) {
                     all_visuals_completed = false;
@@ -1766,6 +1893,26 @@ class Game {
             player.angle = Math.sin(state_timer / 2) * 15;
         }
 
+        render();
+
+        for (dude in Entity.get(Dude)) {
+            if (dude.attacked) {
+                var attack_progress = 1 - Math.abs(state_timer / weapon_visual_timer_max - 0.5);
+                var attack_dst = 50;
+                Gfx.fill_circle((dude.x + 0.5) * tilesize + dude.dx * attack_progress * attack_dst,
+                    (dude.y + 0.5) * tilesize + dude.dy * attack_progress * attack_dst, 10, Col.BLUE);
+                if (state_timer < weapon_visual_timer_max) {
+                    all_visuals_completed = false;
+                }
+            }
+        }
+
+        if (explosion_happened) {
+            Gfx.fill_circle((explosion_x + 0.5) * tilesize, (explosion_y + 0.5) * tilesize, 30 * state_timer / move_visual_timer_max, Col.YELLOW);
+            if (state_timer < move_visual_timer_max) {
+                all_visuals_completed = false;
+            }
+        }
 
         state_timer++;
         if (all_visuals_completed) {
@@ -1776,6 +1923,7 @@ class Game {
             for (dude in Entity.get(Dude)) {
                 dude.hit = false;
             }
+            explosion_happened = false;
         }
     }
 
@@ -1906,38 +2054,14 @@ class Game {
                 }
 
                 if (updated_card != null) {
-                    // Remove items on card
-                    var removed_items = new Array<Item>();
-                    for (item in Entity.get(Item)) {
-                        if (item.on_ground && Std.int(item.x / card_width) == updated_card.x && Std.int(item.y / card_height) == updated_card.y) {
-                            removed_items.push(item);
-                        }
-                    }
-                    for (item in removed_items) {
-                        item.delete();
-                    }
-                    // Remove dudes on card
-                    var removed_dudes = new Array<Item>();
-                    for (dude in Entity.get(Dude)) {
-                        if (Std.int(dude.x / card_width) == updated_card.x && Std.int(dude.y / card_height) == updated_card.y) {
-                            removed_dudes.push(dude);
-                        }
-                    }
-                    for (dude in removed_dudes) {
-                        dude.delete();
-                    }
+                    // Reset card and re-generate
+                    reset_card(updated_card);
 
                     card_update_timer = card_update_timer_max;
                     updated_card.type = random_card_type();
                     if (default_card_type != null) {
                         updated_card.type = default_card_type;
                     }
-                    // Reset card and regenerate
-                    updated_card.covered = true;
-                    updated_card.visited = false;
-                    updated_card.arcana_activated = false;
-                    updated_card.turn_age = 0;
-                    updated_card.update_age = 0;
 
                     generate_card(updated_card);
 

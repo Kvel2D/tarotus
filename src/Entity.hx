@@ -101,6 +101,7 @@ class Dude extends Entity {
 	var real_y = 0;
 	var active = false;
 	var attacked = false;
+	var blown = false;
 	var moved = false;
 	var following_player = false;
 	var dx = 0;
