@@ -89,7 +89,7 @@ class Game {
     static inline var DRAW_LOS_DEBUG = false;
 
     static var default_card_type = null;
-    static var default_arcana_type = ArcanaType_HangedMan;
+    static var default_arcana_type = ArcanaType_Lovers;
     static var default_item_type = null;
     static var default_weapon_type = null;
     static var default_armor_type = null;
@@ -646,61 +646,59 @@ class Game {
                     item.type = default_item_type;
                 }
 
-                function fill_out_item_stats(item) {
-                    item.info += '\nI am ${item.type}!';
+                item.info += '\nI am ${item.type}!';
 
-                    if (item.type == ItemType_Consumable) {
-                        item.consumable_type = random_enum(ConsumableType, 1);
-                        if (default_consumable_type != null) {
-                            item.type = default_consumable_type;
-                        }
-                        item.value = 2 * card_level;
-                        item.tile = Tiles.Potion;
-                        item.name = "Potion";
-                    } else if (item.type == ItemType_Armor) {
-                        item.armor_type = random_enum(ArmorType, 1);
-                        if (default_armor_type != null) {
-                            item.consumable_type = default_armor_type;
-                        }
-                        item.value = Std.int(Random.float(0.8, 1.2) * card_level);
-                        if (item.value == 0) {
-                            item.value = 1;
-                        }
-                        item.value_max = item.value;
-                        item.name = "Armor";
-                        switch (item.armor_type) {
-                            case ArmorType_Chest: item.tile = Tiles.Chest;
-                            case ArmorType_Head: item.tile = Tiles.Head;
-                            case ArmorType_Legs: item.tile = Tiles.Legs;
-                            default: item.tile = Tiles.Wilhelm;
-                        }
-                    } else if (item.type == ItemType_Weapon) {
-                        item.weapon_type = random_enum(WeaponType, 1);
-                        if (default_weapon_type != null) {
-                            item.weapon_type = default_weapon_type;
-                        }
-
-                        item.name = "Weapon";
-                        switch (item.weapon_type) {
-                            case WeaponType_Sword: item.value = 2 * card_level;
-                            case WeaponType_Spear: item.value = 1 * card_level;
-                            case WeaponType_Bow: item.value = 1 * card_level;
-                            default: item.value = 0;
-                        }
-                        switch (item.weapon_type) {
-                            case WeaponType_Sword: item.tile = Tiles.Sword;
-                            case WeaponType_Spear: item.tile = Tiles.Spear;
-                            case WeaponType_Bow: item.tile = Tiles.Bow;
-                            default: item.tile = Tiles.Wilhelm;
-                        }
-                    } else if (item.type == ItemType_Arrows) {
-                        item.amount = Random.int(7, 11);
-                        item.tile = Tiles.Arrows;
-                        item.name = "Arrows";
-                    } else if (item.type == ItemType_Bomb) {
-                        item.tile = Tiles.Bomb;
-                        item.name = "Bomb";
+                if (item.type == ItemType_Consumable) {
+                    item.consumable_type = random_enum(ConsumableType, 1);
+                    if (default_consumable_type != null) {
+                        item.type = default_consumable_type;
                     }
+                    item.value = 2 * card_level;
+                    item.tile = Tiles.Potion;
+                    item.name = "Potion";
+                } else if (item.type == ItemType_Armor) {
+                    item.armor_type = random_enum(ArmorType, 1);
+                    if (default_armor_type != null) {
+                        item.consumable_type = default_armor_type;
+                    }
+                    item.value = Std.int(Random.float(0.8, 1.2) * card_level);
+                    if (item.value == 0) {
+                        item.value = 1;
+                    }
+                    item.value_max = item.value;
+                    item.name = "Armor";
+                    switch (item.armor_type) {
+                        case ArmorType_Chest: item.tile = Tiles.Chest;
+                        case ArmorType_Head: item.tile = Tiles.Head;
+                        case ArmorType_Legs: item.tile = Tiles.Legs;
+                        default: item.tile = Tiles.Wilhelm;
+                    }
+                } else if (item.type == ItemType_Weapon) {
+                    item.weapon_type = random_enum(WeaponType, 1);
+                    if (default_weapon_type != null) {
+                        item.weapon_type = default_weapon_type;
+                    }
+
+                    item.name = "Weapon";
+                    switch (item.weapon_type) {
+                        case WeaponType_Sword: item.value = 2 * card_level;
+                        case WeaponType_Spear: item.value = 1 * card_level;
+                        case WeaponType_Bow: item.value = 1 * card_level;
+                        default: item.value = 0;
+                    }
+                    switch (item.weapon_type) {
+                        case WeaponType_Sword: item.tile = Tiles.Sword;
+                        case WeaponType_Spear: item.tile = Tiles.Spear;
+                        case WeaponType_Bow: item.tile = Tiles.Bow;
+                        default: item.tile = Tiles.Wilhelm;
+                    }
+                } else if (item.type == ItemType_Arrows) {
+                    item.amount = Random.int(7, 11);
+                    item.tile = Tiles.Arrows;
+                    item.name = "Arrows";
+                } else if (item.type == ItemType_Bomb) {
+                    item.tile = Tiles.Bomb;
+                    item.name = "Bomb";
                 }
                 walls[item.x][item.y] = false;
                 
