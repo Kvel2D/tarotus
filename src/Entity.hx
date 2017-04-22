@@ -88,7 +88,7 @@ class Player extends Entity {
 	var dy = 0;
 
 	var hp = 5;
-	var hp_max = 10;
+	var hp_max = 5;
 	var armor = 0;
 
 	var weapon = WeaponType_None;

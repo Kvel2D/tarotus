@@ -61,6 +61,8 @@ class Card {
     var x = 0;
     var y = 0;
     var level = 0;
+    var completed = true;
+    var my_dudes = new Array<Dude>();
 
     function new() {}
 }
@@ -89,7 +91,7 @@ class Game {
     static inline var DRAW_LOS_DEBUG = false;
 
     static var default_card_type = null;
-    static var default_arcana_type = ArcanaType_Lovers;
+    static var default_arcana_type = ArcanaType_Sun;
     static var default_item_type = null;
     static var default_weapon_type = null;
     static var default_armor_type = null;
@@ -146,6 +148,7 @@ class Game {
     var player:Player;
     var inventory = new Vector<Item>(inventory_slots);
     var history = new Array<Array<String>>();
+    var fist_damage = 1;
 
     var active_arcana: ArcanaType = ArcanaType_None;
     var arcana_timer = 0;
@@ -166,11 +169,12 @@ class Game {
         for (i in 0...cards.length) {
             cards[i] = new Vector<Card>(cardmap_height);
 
+
             for (j in 0...cards[i].length) {
                 cards[i][j] = new Card();
+                reset_card(cards[i][j]);
                 cards[i][j].x = i;
                 cards[i][j].y = j;
-                // NOTE: watch out for when you add more card types that should not be rare
                 cards[i][j].type = random_card_type();
                 if (default_card_type != null) {
                     cards[i][j].type = default_card_type;
@@ -217,6 +221,7 @@ class Game {
 
     var type_chances_default = [
     CardType_None => 0,
+    // CardType_Arcana => 5,
     CardType_Arcana => 50,
     CardType_Weapon => 10,
     CardType_Treasure => 30,
@@ -277,7 +282,7 @@ class Game {
         }
 
 
-        var k = Random.int(0, chance_sum);
+        var k = Random.int(1, chance_sum);
         var type: CardType = null;
         for (i in 0...card_types.length) {
             if (k <= chances_incremented[i]) {
@@ -368,19 +373,24 @@ class Game {
                 make_message("Cards are replaced faster for some time");
             }
             case ArcanaType_Emperor: {
+                var no_weapons = true;
                 for (i in 0...inventory_slots) {
                     var item = inventory[i];
-                    if (item.type == ItemType_Weapon) {
+                    if (item != null && item.type == ItemType_Weapon) {
                         item.value = Math.ceil(item.value * 1.2);
+                        no_weapons = false;
                         break;
                     }
+                }
+                if (no_weapons) {
+                    fist_damage++;
                 }
                 make_message("Current weapon has become stronger");
             }
             case ArcanaType_Hierophant: {
                 for (i in 0...inventory_slots) {
                     var item = inventory[i];
-                    if (item.type == ItemType_Armor) {
+                    if (item != null && item.type == ItemType_Armor) {
                         item.value = item.value_max;
                     }
                 }
@@ -407,10 +417,12 @@ class Game {
             }
             case ArcanaType_Fortune:
             case ArcanaType_Justice: {
+                var player_card = card_at_position(player.x, player.y);
+
                 for (x in 0...cardmap_width) {
                     for (y in 0...cardmap_height) {
                         var card = cards[x][y];
-                        if (!card.covered) {
+                        if (!card.covered && card != player_card) {
                             reset_card(card);
                             generate_card(card);
                         }
@@ -533,6 +545,8 @@ class Game {
         card.arcana_activated = false;
         card.turn_age = 0;
         card.update_age = 0;
+        card.completed = false;
+        card.my_dudes.splice(0, card.my_dudes.length);
     }
 
     function generate_card(card:Card) {
@@ -620,6 +634,7 @@ class Game {
         if (card.type == CardType_Dude) {
             // Spawn dude
             var dude = new Dude();
+            card.my_dudes.push(dude);
             var free_cell = random_cell_in_card(card.x, card.y, function(x, y) { return !walls[x][y]; });
             dude.x = free_cell.x;
             dude.y = free_cell.y;
@@ -730,7 +745,7 @@ class Game {
     }
 
     function get_free_map(ignore_covered_cards = false): Vector<Vector<Bool>> {
-        // Mark items/dudes/walls/player/cells in covered cards as false
+        // Mark items/dudes/walls/player/covered cards as false, don't ignore player
         var free_map = Data.bool_2dvector(map_width, map_height, true);
         for (dude in Entity.get(Dude)) {
             free_map[dude.x + dude.dx][dude.y + dude.dy] = false;
@@ -784,6 +799,7 @@ class Game {
         }
 
         var move_map = get_free_map(ignore_covered_cards);
+        move_map[player.x][player.y] = true; // destination cell needs to be "free" for the algorithm to find paths
 
         var infinity = 10000000;
         var closed = Data.bool_2dvector(map_width, map_height, false);
@@ -950,10 +966,10 @@ class Game {
 
 
         var font_size = Text.currentsize;
-        Text.change_size(60);
+        Text.change_size(40);
         var card: Card;
         if (active_arcana == ArcanaType_Sun) {
-            Gfx.image_alpha(0.5);
+            Gfx.image_alpha(0.3);
         }
         for (x in 0...cardmap_width) {
             for (y in 0...cardmap_height) {
@@ -1836,7 +1852,7 @@ class Game {
                 case WeaponType_Bow: attack_distance = Std.int(Math.max(map_width, map_height));
             }
 
-            var attack_damage = 1;
+            var attack_damage = fist_damage;
             for (i in 0...inventory_slots) {
                 if (inventory[i] != null && inventory[i].type == ItemType_Weapon) {
                     attack_damage = inventory[i].value;
@@ -1972,6 +1988,7 @@ class Game {
                         // Otherwise chase player(to the new position)
                         if (!dude.attacked) {
                             var path = a_star(dude.x, dude.y, player.x, player.y);
+                            trace(path.length);
                             if (path.length > 1) {
                                 dude.moved = true;
                                 dude.dx = path[path.length - 2].x - dude.x;
@@ -2149,6 +2166,25 @@ class Game {
         var dudes = Entity.get(Dude);
         for (dude in dead_dudes) {
             dudes.remove(dude);
+        }
+
+        // Dude cards get completed when all dudes spawned from it are dead
+        for (x in 0...cardmap_width) {
+            for (y in 0...cardmap_height) {
+                var card = cards[x][y];
+                if (!card.covered && card.type == CardType_Dude) {
+                    var all_dudes_dead = true;
+                    for (dude in card.my_dudes) {
+                        if (!dude.dead) {
+                            all_dudes_dead = false;
+                            break;
+                        }
+                    }
+                    if (all_dudes_dead) {
+                        card.completed = true;
+                    }
+                }
+            }
         }
 
         for (x in 0...cardmap_width) {
