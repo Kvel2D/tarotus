@@ -90,7 +90,7 @@ class Game {
     static inline var ARROW_HACK = false;
     static inline var DRAW_LOS_DEBUG = false;
 
-    static var default_card_type = null;
+    static var default_card_type = CardType_Dude;
     static var default_arcana_type = ArcanaType_Sun;
     static var default_item_type = null;
     static var default_weapon_type = null;
@@ -180,6 +180,10 @@ class Game {
                     cards[i][j].type = default_card_type;
                 }
                 cards[i][j].covered = true;
+
+                if (i == 0 && j == 0) {
+
+                }
             }
         }
         cards[0][0].covered = false;
@@ -512,6 +516,9 @@ class Game {
                 var enum_index = Std.parseInt(pair[1].split('_')[1]);
                 var enum_value = Type.allEnums(enum_type)[enum_index];
                 Reflect.setField(entity, pair[0], enum_value);
+            } else if (pair[1].indexOf('[') != -1) {
+                // Array member serialization is not supported
+                Reflect.setField(entity, pair[0], new Array());
             } else {
                 // String
                 Reflect.setField(entity, pair[0], pair[1]);
@@ -545,7 +552,7 @@ class Game {
         card.arcana_activated = false;
         card.turn_age = 0;
         card.update_age = 0;
-        card.completed = false;
+        card.completed = true; // only used for dude card type
         card.my_dudes.splice(0, card.my_dudes.length);
     }
 
@@ -559,7 +566,7 @@ class Game {
         }
 
         function random_cell_in_card(card_x: Int, card_y: Int, is_good: Int->Int->Bool): IntVector2 {
-            var out: IntVector2 = {x: 0, y: 0};
+            var out: IntVector2 = {x: -1, y: -1};
             var x_start = card.x * card_width;
             var x_end = x_start + card_width;
             var y_start = card.y * card_height;
@@ -589,6 +596,7 @@ class Game {
                 }
             }
 
+            trace("random_cell_in_card() failed to find a free cell!");
             return out;
         }
 
@@ -632,19 +640,25 @@ class Game {
 
         //TODO: make a better formula for item and dude values based on card level(currently simply linear)
         if (card.type == CardType_Dude) {
-            // Spawn dude
-            var dude = new Dude();
-            card.my_dudes.push(dude);
-            var free_cell = random_cell_in_card(card.x, card.y, function(x, y) { return !walls[x][y]; });
-            dude.x = free_cell.x;
-            dude.y = free_cell.y;
-            dude.real_x = dude.x * tilesize;
-            dude.real_y = dude.y * tilesize;
-            walls[dude.x][dude.y] = false;
-            update_dude_info(dude);
+            card.completed = false;
 
-            dude.hp_max = card_level * 2;
-            dude.hp = dude.hp_max;
+            var number_of_dudes = Random.int(1, 2);
+            while (number_of_dudes > 0) {
+                number_of_dudes--;
+
+                // Spawn dude
+                var dude = new Dude();
+                card.my_dudes.push(dude);
+                var free_map = get_free_map(false);
+                var free_cell = random_cell_in_card(card.x, card.y, function(x, y) { return free_map[x][y]; });
+                dude.x = free_cell.x;
+                dude.y = free_cell.y;
+                dude.real_x = dude.x * tilesize;
+                dude.real_y = dude.y * tilesize;
+                update_dude_info(dude);
+                dude.hp_max = card_level * 2;
+                dude.hp = dude.hp_max;
+            }
         } else if (card.type == CardType_Treasure || card.type == CardType_Weapon) {
             function spawn_item(bad_x = -1, bad_y = -1) {            
                 var item = new Item();
@@ -744,25 +758,13 @@ class Game {
         }
     }
 
-    function get_free_map(ignore_covered_cards = false): Vector<Vector<Bool>> {
+    // each bool tells what to filter out
+    function get_free_map(filter_covered_cards = true, filter_dudes = true, filter_items = true, 
+        filter_walls = true, filter_player = true): Vector<Vector<Bool>> 
+    {
         // Mark items/dudes/walls/player/covered cards as false, don't ignore player
         var free_map = Data.bool_2dvector(map_width, map_height, true);
-        for (dude in Entity.get(Dude)) {
-            free_map[dude.x + dude.dx][dude.y + dude.dy] = false;
-        }
-        for (item in Entity.get(Item)) {
-            if (item.on_ground) {
-                free_map[item.x][item.y] = false;
-            }
-        }
-        for (x in 0...map_width) {
-            for (y in 0...map_height) {
-                if (walls[x][y]) {
-                    free_map[x][y] = false;
-                }
-            }
-        }
-        if (!ignore_covered_cards) {
+        if (filter_covered_cards) {
             for (x in 0...cardmap_width) {
                 for (y in 0...cardmap_height) {
                     if (cards[x][y].covered) {
@@ -775,12 +777,39 @@ class Game {
                 }
             }
         }
-        free_map[player.x][player.y] = false;
+        if (filter_dudes) {
+            for (dude in Entity.get(Dude)) {
+                if (dude.moved) {
+                    free_map[dude.x + dude.dx][dude.y + dude.dy] = false;
+                } else {
+                    free_map[dude.x][dude.y] = false;
+                }
+            }
+        }
+        if (filter_items) {
+            for (item in Entity.get(Item)) {
+                if (item.on_ground) {
+                    free_map[item.x][item.y] = false;
+                }
+            }
+        }
+        if (filter_walls) {
+            for (x in 0...map_width) {
+                for (y in 0...map_height) {
+                    if (walls[x][y]) {
+                        free_map[x][y] = false;
+                    }
+                }
+            }
+        }
+        if (filter_player) {
+            free_map[player.x][player.y] = false;
+        }
 
         return free_map;
     }
 
-    function a_star(x1:Int, y1:Int, x2:Int, y2:Int, ignore_covered_cards = false):Array<IntVector2> {
+    function a_star(x1:Int, y1:Int, x2:Int, y2:Int, include_covered_cards = false, only_walls = false):Array<IntVector2> {
         function heuristic_score(x1:Int, y1:Int, x2:Int, y2:Int):Int {
             return Std.int(Math.abs(x2 - x1) + Math.abs(y2 - y1));
         }
@@ -798,8 +827,13 @@ class Game {
             return path;
         }
 
-        var move_map = get_free_map(ignore_covered_cards);
-        move_map[player.x][player.y] = true; // destination cell needs to be "free" for the algorithm to find paths
+        var move_map: Vector<Vector<Bool>>;
+        if (only_walls) {
+            move_map = get_free_map(!include_covered_cards, false, false, true, false);
+        } else {
+            move_map = get_free_map(!include_covered_cards);
+        }
+        move_map[x2][y2] = true; // destination cell needs to be "free" for the algorithm to find paths correctly
 
         var infinity = 10000000;
         var closed = Data.bool_2dvector(map_width, map_height, false);
@@ -974,16 +1008,18 @@ class Game {
         for (x in 0...cardmap_width) {
             for (y in 0...cardmap_height) {
                 card = cards[x][y];
+
+                var card_color = 0;
+                switch (card.type) {
+                    case CardType_Nothing: card_color = Col.BROWN;
+                    case CardType_Dude: card_color = Col.RED;
+                    case CardType_Treasure: card_color = Col.YELLOW;
+                    case CardType_Weapon: card_color = Col.GREEN;
+                    case CardType_Arcana: card_color = Col.DARKGREEN;
+                    case CardType_None: card_color = Col.BLACK;
+                }
+
                 if (card.covered) {
-                    var card_color = 0;
-                    switch (card.type) {
-                        case CardType_Nothing: card_color = Col.BROWN;
-                        case CardType_Dude: card_color = Col.RED;
-                        case CardType_Treasure: card_color = Col.YELLOW;
-                        case CardType_Weapon: card_color = Col.GREEN;
-                        case CardType_Arcana: card_color = Col.DARKGREEN;
-                        case CardType_None: card_color = Col.BLACK;
-                    }
                     if (DRAW_IMAGE_COVER) {
                         Gfx.draw_image(x * card_width * tilesize, y * card_height * tilesize, "card");
                     }
@@ -1007,6 +1043,11 @@ class Game {
                         }
                         Gfx.fill_circle((x * card_width + 1.5) * tilesize, (y * card_height + 2.5) * tilesize, 
                             tilesize * 0.75, arcana_color, 0.5);
+                    } else if (card.type == CardType_Dude) {
+                        if (card.completed) {
+                            Gfx.fill_box(x * card_width * tilesize, y * card_height * tilesize,
+                                card_width * tilesize, card_height * tilesize, card_color, 0.15);
+                        }
                     }
                 }
             }
@@ -1988,7 +2029,6 @@ class Game {
                         // Otherwise chase player(to the new position)
                         if (!dude.attacked) {
                             var path = a_star(dude.x, dude.y, player.x, player.y);
-                            trace(path.length);
                             if (path.length > 1) {
                                 dude.moved = true;
                                 dude.dx = path[path.length - 2].x - dude.x;
@@ -2036,10 +2076,17 @@ class Game {
     function update_enemy_visual() {
         var all_visuals_completed = true;
 
+        var visual_progress = 0.0;
         for (dude in Entity.get(Dude)) {
             if (dude.moved) {
-                dude.real_x = Std.int(dude.x * tilesize + dude.dx * tilesize * (state_timer / move_visual_timer_max));
-                dude.real_y = Std.int(dude.y * tilesize + dude.dy * tilesize * (state_timer / move_visual_timer_max));
+                if (state_timer > move_visual_timer_max) {
+                    visual_progress = 1;
+                } else {
+                    visual_progress = state_timer / move_visual_timer_max;
+                }
+                dude.real_x = Std.int(dude.x * tilesize + dude.dx * tilesize * visual_progress);
+                dude.real_y = Std.int(dude.y * tilesize + dude.dy * tilesize * visual_progress);
+                
                 if (state_timer < move_visual_timer_max) {
                     all_visuals_completed = false;
                 }
@@ -2088,6 +2135,8 @@ class Game {
                 all_visuals_completed = false;
             }
         }
+
+        trace(state_timer);
 
         state_timer++;
         if (all_visuals_completed) {
@@ -2223,7 +2272,8 @@ class Game {
                 var card_queue = new Array<Card>();
                 for (x in 0...cardmap_width) {
                     for (y in 0...cardmap_height) {
-                        if (!cards[x][y].covered) {
+                        var card = cards[x][y];
+                        if (!card.covered && card.completed) {
                             card_queue.push(cards[x][y]);
                         }
                     }

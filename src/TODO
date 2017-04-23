@@ -1,16 +1,15 @@
-implement all arcanas
-test all arcanas
+
 implement completed dude cards spawning treasure cards mechanic
-implement checking for dude cards completeness
-maybe add a dude card complete visual
 
 card cover/uncover/replace animations
 make items/armor more rare and crappier at the start
 more items
 do make an experience system, levels raise your max health/mana, stats, stats improve weapons
 
-DONE:
+implement all arcanas
+test all arcanas
 
+DONE:
 
 ---------------------------------------------------------------------------------------------------
 MILESTONES
@@ -43,7 +42,7 @@ break down weapons into materials, use materials at a blacksmith
 ---------------------------------------------------------------------------------------------------
 NOTES
 ---------------------------------------------------------------------------------------------------
-
+watch out for visual timers going over 1.0, maybe rework
 
 CARD MAGIC
 $*0FOOL        next 5 cards are nothing 
