@@ -63,6 +63,7 @@ class Card {
     var level = 0;
     var completed = true;
     var my_dudes = new Array<Dude>();
+    var just_updated_timer = 0;
 
     function new() {}
 }
@@ -90,8 +91,8 @@ class Game {
     static inline var ARROW_HACK = false;
     static inline var DRAW_LOS_DEBUG = false;
 
-    static var default_card_type = CardType_Dude;
-    static var default_arcana_type = ArcanaType_Sun;
+    static var default_card_type = null;
+    static var default_arcana_type = null;
     static var default_item_type = null;
     static var default_weapon_type = null;
     static var default_armor_type = null;
@@ -144,6 +145,7 @@ class Game {
     var card_level_increment_timer = Random.int(card_level_increment_timer_min, card_level_increment_timer_max);
     var card_type_history = new Array<CardType>();
     static inline var too_old_age = 30;
+    var pending_treasure_cards = 0;
 
     var player:Player;
     var inventory = new Vector<Item>(inventory_slots);
@@ -175,7 +177,7 @@ class Game {
                 reset_card(cards[i][j]);
                 cards[i][j].x = i;
                 cards[i][j].y = j;
-                cards[i][j].type = random_card_type();
+                cards[i][j].type = generate_card_type();
                 if (default_card_type != null) {
                     cards[i][j].type = default_card_type;
                 }
@@ -225,31 +227,33 @@ class Game {
 
     var type_chances_default = [
     CardType_None => 0,
-    // CardType_Arcana => 5,
-    CardType_Arcana => 50,
-    CardType_Weapon => 10,
-    CardType_Treasure => 30,
+    CardType_Arcana => 5,
+    CardType_Weapon => 1,
+    CardType_Treasure => 1,
     CardType_Dude => 20,
-    CardType_Nothing => 40,
+    CardType_Nothing => 60,
     ];
-    // Max and min per 15 cards
-    var type_max = [
-    CardType_None => 0 / 15,
-    CardType_Arcana => 2 / 15,
-    CardType_Weapon => 3 / 15,
-    CardType_Treasure => 4 / 15,
-    CardType_Dude => 4 / 15,
-    CardType_Nothing => 8 / 15,
-    ];
+    // Min and max bounds per 15 cards 
+    // if current card concentration is below min => double chance
+    // if above max => halve chance
     var type_min = [
     CardType_None => 0 / 15,
     CardType_Arcana => 0 / 15,
-    CardType_Weapon => 1 / 15,
-    CardType_Treasure => 1 / 15,
+    CardType_Weapon => 0 / 15,
+    CardType_Treasure => 0 / 15,
     CardType_Dude => 1 / 15,
     CardType_Nothing => 3 / 15,
     ];
-    function random_card_type():Dynamic {
+    var type_max = [
+    CardType_None => 0 / 15,
+    CardType_Arcana => 2 / 15,
+    CardType_Weapon => 2 / 15,
+    CardType_Treasure => 2 / 15,
+    CardType_Dude => 10 / 15,
+    CardType_Nothing => 13 / 15,
+    ];
+    
+    function generate_card_type():Dynamic {
         var card_types = Type.allEnums(CardType);
         var type_chances = new Map<CardType, Int>();
         for (type in card_types) {
@@ -295,7 +299,7 @@ class Game {
             }
         }
 
-        // Force card type(arcana card effect)
+        // Force card type(arcana card effect or treasure card after completing dude card)
         if (arcana_timer > 0 && (active_arcana == ArcanaType_Fool
             || active_arcana == ArcanaType_Strength
             || active_arcana == ArcanaType_Death
@@ -307,12 +311,20 @@ class Game {
                 case ArcanaType_Strength: type = CardType_Weapon;
                 case ArcanaType_Death: type = CardType_Dude;
                 case ArcanaType_Star: type = CardType_Treasure;
-                default: trace("Unhandled case in random_card_type() arcana effect!");
+                default: trace("Unhandled case in generate_card_type() arcana effect!");
             }
 
             arcana_timer--;
             if (arcana_timer <= 0) {
                 active_arcana = null;
+            }
+        } else if (pending_treasure_cards > 0) {
+            pending_treasure_cards--;
+
+            if (Random.chance(20)) {
+                type = CardType_Weapon;
+            } else {
+                type = CardType_Treasure;
             }
         }
 
@@ -330,19 +342,19 @@ class Game {
             case ArcanaType_None:
 
             case ArcanaType_Fool: {
-                make_message("Next 5 cards are nothing");
+                make_message("Next 5 cards are nothing cards");
                 arcana_timer = 5;
             }
             case ArcanaType_Strength: {
-                make_message("Next 5 cards are weapon");
+                make_message("Next 5 cards are weapon cards");
                 arcana_timer = 5;
             }
             case ArcanaType_Death: {
-                make_message("Next 5 cards are dude");
+                make_message("Next 5 cards are dude cards");
                 arcana_timer = 5;
             }
             case ArcanaType_Star: {
-                make_message("Next 5 cards are treasure");
+                make_message("Next 5 cards are treasure cards");
                 arcana_timer = 5;
             }
 
@@ -361,7 +373,7 @@ class Game {
                         var card = cards[x][y];
                         if (card.covered) {
                             reset_card(card);
-                            card.type = random_card_type();
+                            card.type = generate_card_type();
                             generate_card(card);
                         }
                     }
@@ -632,7 +644,11 @@ class Game {
 
             if (!path_exists) {
                 var random_wall = random_cell_in_card(card.x, card.y, function(x, y) { return walls[x][y]; });
-                walls[random_wall.x][random_wall.y] = false;
+                if (random_wall.x == -1) {
+                    break;
+                } else {
+                    walls[random_wall.x][random_wall.y] = false;
+                }
             }
             
             loop_number++;
@@ -656,7 +672,7 @@ class Game {
                 dude.real_x = dude.x * tilesize;
                 dude.real_y = dude.y * tilesize;
                 update_dude_info(dude);
-                dude.hp_max = card_level * 2;
+                dude.hp_max = Std.int(Math.max(1, Math.ceil(card_level * 1.4 / number_of_dudes)));
                 dude.hp = dude.hp_max;
             }
         } else if (card.type == CardType_Treasure || card.type == CardType_Weapon) {
@@ -920,6 +936,7 @@ class Game {
         function draw_item(x: Float, y: Float, item: Item) {
             Gfx.draw_tile(x, y, item.tile);
             Text.display(x, y, item.name);
+            Text.display(x, y + tilesize / 2, '${item.value}');
             if (item.type == ItemType_Arrows) {
                 Text.display(x + tilesize / 10, y + tilesize / 2, '${item.amount}');
             } else if (item.type == ItemType_Armor && item.value <= 0) {
@@ -1049,6 +1066,14 @@ class Game {
                                 card_width * tilesize, card_height * tilesize, card_color, 0.15);
                         }
                     }
+                }
+
+
+                if (card.just_updated_timer > 0) {
+                    card.just_updated_timer--;
+
+                    Gfx.fill_circle((x * card_width + 1.5) * tilesize, (y * card_height + 2.5) * tilesize, 
+                            card.just_updated_timer * 1.5, Col.YELLOW, 0.5);
                 }
             }
         }
@@ -2136,7 +2161,6 @@ class Game {
             }
         }
 
-        trace(state_timer);
 
         state_timer++;
         if (all_visuals_completed) {
@@ -2221,7 +2245,7 @@ class Game {
         for (x in 0...cardmap_width) {
             for (y in 0...cardmap_height) {
                 var card = cards[x][y];
-                if (!card.covered && card.type == CardType_Dude) {
+                if (!card.covered && card.type == CardType_Dude && !card.completed) {
                     var all_dudes_dead = true;
                     for (dude in card.my_dudes) {
                         if (!dude.dead) {
@@ -2230,6 +2254,7 @@ class Game {
                         }
                     }
                     if (all_dudes_dead) {
+                        pending_treasure_cards++; // spawn treasure after completing dude card
                         card.completed = true;
                     }
                 }
@@ -2313,7 +2338,7 @@ class Game {
                     reset_card(updated_card);
 
                     card_update_timer = card_update_timer_max;
-                    updated_card.type = random_card_type();
+                    updated_card.type = generate_card_type();
                     if (default_card_type != null) {
                         updated_card.type = default_card_type;
                     }
@@ -2334,6 +2359,8 @@ class Game {
                             cards[x][y].update_age++;
                         }
                     }
+
+                    updated_card.just_updated_timer = 60;
                 }
             }
         }
