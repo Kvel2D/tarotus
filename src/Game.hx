@@ -1,4 +1,5 @@
 import haxegon.*;
+import haxe.ds.ObjectMap;
 import haxe.ds.Vector;
 import Entity;
 
@@ -21,7 +22,6 @@ enum CardType {
     CardType_Treasure;
     CardType_Weapon;
     CardType_Arcana;
-    CardType_Nothing;
 }
 
 enum ArcanaType {
@@ -66,6 +66,12 @@ class Card {
     var just_updated_timer = 0;
 
     function new() {}
+}
+
+typedef Chance = {
+    val: Int,
+    min: Float,
+    max: Float,
 }
 
 typedef Particle = {
@@ -135,7 +141,7 @@ class Game {
 
     var walls = Data.bool_2dvector(map_width, map_height);
     var cards = new Vector<Vector<Card>>(cardmap_width);
-    var cards_uncovered = 0;
+    var cards_covered = 0;
     static inline var total_cards = cardmap_width * cardmap_height;
     static inline var card_update_timer_max = 10; // turns
     var card_update_timer = card_update_timer_max;
@@ -167,35 +173,41 @@ class Game {
             inventory[i] = null;
         }
 
-        // Set cards
-        for (i in 0...cards.length) {
-            cards[i] = new Vector<Card>(cardmap_height);
-
-
-            for (j in 0...cards[i].length) {
-                cards[i][j] = new Card();
-                reset_card(cards[i][j]);
-                cards[i][j].x = i;
-                cards[i][j].y = j;
-                cards[i][j].type = generate_card_type();
-                if (default_card_type != null) {
-                    cards[i][j].type = default_card_type;
-                }
-                cards[i][j].covered = true;
-
-                if (i == 0 && j == 0) {
-
-                }
-            }
-        }
-        cards[0][0].covered = false;
-        cards_uncovered = 1;
-        cards[0][0].type = CardType_None;
-
         player = new Player();
         player.x = 2;
         player.y = 1;
+        player.real_x = player.x * tilesize;
+        player.real_y = player.y * tilesize;
+        var player_card = card_at_position(player.x, player.y);
 
+        // Set card positions/types
+        for (i in 0...cards.length) {
+            cards[i] = new Vector<Card>(cardmap_height);
+
+            for (j in 0...cards[i].length) {
+                cards[i][j] = new Card();
+                var card = cards[i][j];
+
+
+                card.x = i;
+                card.y = j;
+                reset_card(card);
+
+                if (Random.chance(40) && (i != player_card.x || j != player_card.y)) {
+                    card.type = generate_card_type();
+                    if (default_card_type != null) {
+                        card.type = default_card_type;
+                    }
+                    card.covered = true;
+                    cards_covered++;
+                } else {
+                    card.type = CardType_None;
+                    card.covered = false;
+                }
+            }
+        }
+
+        // Generate cards
         for (x in 0...cardmap_width) {
             for (y in 0...cardmap_height) {
                 generate_card(cards[x][y]);
@@ -204,8 +216,6 @@ class Game {
         }
 
         walls[player.x][player.y] = false;
-        player.real_x = player.x * tilesize;
-        player.real_y = player.y * tilesize;
 
 
         if (ARROW_HACK) {
@@ -225,89 +235,85 @@ class Game {
         return Type.allEnums(enum_type)[k];
     }
 
-    var type_chances_default = [
-    CardType_None => 0,
-    CardType_Arcana => 5,
-    CardType_Weapon => 1,
-    CardType_Treasure => 1,
-    CardType_Dude => 20,
-    CardType_Nothing => 60,
-    ];
-    // Min and max bounds per 15 cards 
-    // if current card concentration is below min => double chance
-    // if above max => halve chance
-    var type_min = [
-    CardType_None => 0 / 15,
-    CardType_Arcana => 0 / 15,
-    CardType_Weapon => 0 / 15,
-    CardType_Treasure => 0 / 15,
-    CardType_Dude => 1 / 15,
-    CardType_Nothing => 3 / 15,
-    ];
-    var type_max = [
-    CardType_None => 0 / 15,
-    CardType_Arcana => 2 / 15,
-    CardType_Weapon => 2 / 15,
-    CardType_Treasure => 2 / 15,
-    CardType_Dude => 10 / 15,
-    CardType_Nothing => 13 / 15,
-    ];
-    
-    function generate_card_type():Dynamic {
-        var card_types = Type.allEnums(CardType);
-        var type_chances = new Map<CardType, Int>();
-        for (type in card_types) {
-            type_chances[type] = type_chances_default[type];
+    var chance_history = new ObjectMap<Dynamic, Array<Int>>();
+    function get_chance(enum_type: Dynamic, enums: Array<Dynamic>, chances: Array<Chance>) {
+        var chances_incremented = new Vector<Int>(chances.length);
+        for (i in 0...chances.length) {
+            chances_incremented[i] = chances[i].val;
         }
 
-        var type_counts = new Map<CardType, Int>();
-        for (i in 0...card_types.length) {
-            type_counts.set(card_types[i], 0);
+        var counts = new Vector<Int>(chances.length);
+        for (i in 0...chances.length) {
+            counts[i] = 0;
         }
-        for (card_type in card_type_history) {
-            type_counts[card_type] = type_counts[card_type] + 1;
+        if (!chance_history.exists(enum_type)) {
+            chance_history.set(enum_type, new Array<Int>());
         }
 
-        for (card_type in card_types) {
-            if (card_type != CardType_None) {
+        if (chance_history.get(enum_type).length > 15) {
+            chance_history.get(enum_type).pop();
+        }
+        var history = chance_history.get(enum_type);
+        for (i in 0...history.length) {
+            counts[history[i]]++;
+        }
+
+        for (i in 0...chances.length) {
+            if (i != 0) {
                 // If there are too many cards of type, halve the chances
-                if (type_counts[card_type] / card_type_history.length > type_max[card_type]) {
-                    type_chances[card_type] = Std.int(type_chances[card_type] / 2);
+                if (counts[i] / history.length > chances[i].max) {
+                    chances_incremented[i] = Math.floor(chances_incremented[i] / 2);
                 }
                 // If there are too little cards of type, double the chances
-                if (type_counts[card_type] / card_type_history.length < type_min[card_type]) {
-                    type_chances[card_type] = type_chances[card_type] * 2;
+                if (counts[i] / history.length < chances[i].min) {
+                    chances_incremented[i] = Math.ceil(chances_incremented[i] * 2);
                 }
             }
         }
 
-        var chances_incremented = new Vector<Int>(card_types.length);
-        chances_incremented[0] = type_chances[card_types[0]];
         var chance_sum = 0;
-        for (i in 1...card_types.length) {
-            chance_sum += type_chances[card_types[i]];
+        for (i in 1...chances.length) {
+            chance_sum += chances_incremented[i];
             chances_incremented[i] = chance_sum; 
         }
 
-
         var k = Random.int(1, chance_sum);
-        var type: CardType = null;
-        for (i in 0...card_types.length) {
+        var selected = 0;
+        for (i in 0...chances.length) {
             if (k <= chances_incremented[i]) {
-                type = card_types[i];
-                break;
+                chance_history.get(enum_type).insert(0, enums[i]);
+                return enums[i];
             }
         }
 
+        return enums[0];
+    }
+
+    var card_type_order = [
+    CardType_None,
+    CardType_Arcana,
+    CardType_Weapon,
+    CardType_Treasure,
+    CardType_Dude,
+    ];
+    var card_type_chances: Array<Chance> = [
+    {val: 0, min: 0, max: 0}, // None
+    {val: 5, min: 0, max: 2}, // Arcana
+    {val: 2, min: 0, max: 2}, // Weapon
+    {val: 3, min: 0, max: 2}, // Treasure
+    {val: 90, min: 2, max: 8},// Dude
+    ];
+
+    function generate_card_type():Dynamic {
+        var type = CardType_None;
+
         // Force card type(arcana card effect or treasure card after completing dude card)
-        if (arcana_timer > 0 && (active_arcana == ArcanaType_Fool
-            || active_arcana == ArcanaType_Strength
+        if (arcana_timer > 0 && (active_arcana == ArcanaType_Strength
             || active_arcana == ArcanaType_Death
             || active_arcana == ArcanaType_Star
             )) 
         {
             switch (active_arcana) {
-                case ArcanaType_Fool: type = CardType_Nothing;
                 case ArcanaType_Strength: type = CardType_Weapon;
                 case ArcanaType_Death: type = CardType_Dude;
                 case ArcanaType_Star: type = CardType_Treasure;
@@ -326,15 +332,336 @@ class Game {
             } else {
                 type = CardType_Treasure;
             }
+        } else {
+            type = get_chance(CardType, card_type_order, card_type_chances);
         }
 
-
-        card_type_history.insert(0, type);
-        if (card_type_history.length > 15) {
-            card_type_history.pop();
+        var enums = Type.allEnums(CardType);
+        for (i in 0...enums.length) {
+            trace(enums[i]);
         }
 
         return type;
+    }
+
+    function reset_card(card: Card) {
+        // Remove items on card
+        var removed_items = new Array<Item>();
+        for (item in Entity.get(Item)) {
+            if (item.on_ground && Std.int(item.x / card_width) == card.x && Std.int(item.y / card_height) == card.y) {
+                removed_items.push(item);
+            }
+        }
+        for (item in removed_items) {
+            item.delete();
+        }
+        // Remove dudes on card
+        var removed_dudes = new Array<Dude>();
+        for (dude in Entity.get(Dude)) {
+            if (Std.int(dude.x / card_width) == card.x && Std.int(dude.y / card_height) == card.y) {
+                removed_dudes.push(dude);
+            }
+        }
+        for (dude in removed_dudes) {
+            dude.delete();
+        }
+        card.covered = true;
+        card.visited = false;
+        card.arcana_activated = false;
+        card.turn_age = 0;
+        card.update_age = 0;
+        card.completed = true; // only used for dude card type
+        card.my_dudes.splice(0, card.my_dudes.length);
+    }
+
+    // var item_chances_default = [
+    // CardType_None => 0,
+    // CardType_Arcana => 5,
+    // CardType_Weapon => 2,
+    // CardType_Treasure => 3,
+    // CardType_Dude => 90,
+    // ];
+    // var consumable_chances_default = [
+    // CardType_None => 0,
+    // CardType_Arcana => 5,
+    // CardType_Weapon => 2,
+    // CardType_Treasure => 3,
+    // CardType_Dude => 90,
+    // ];
+    // var consumable_chances_default = [
+    // CardType_None => 0,
+    // CardType_Arcana => 5,
+    // CardType_Weapon => 2,
+    // CardType_Treasure => 3,
+    // CardType_Dude => 90,
+    // ];
+
+    function generate_card(card:Card) {
+        var k = Random.int(0, Walls.all.length - 1);
+        var walls_preset = Walls.all[k];
+        for (i in 0...card_width) {
+            for (j in 0...card_height) {
+                walls[card.x * card_width + i][card.y * card_height + j] = (walls_preset[j][i] == 1);
+            }
+        }
+
+        function random_cell_in_card(card_x: Int, card_y: Int, is_good: Int->Int->Bool): IntVector2 {
+            var out: IntVector2 = {x: -1, y: -1};
+            var x_start = card.x * card_width;
+            var x_end = x_start + card_width;
+            var y_start = card.y * card_height;
+            var y_end = y_start + card_height;
+            
+            var free_cell_amount = 0;
+            for (x in x_start...x_end) {
+                for (y in y_start...y_end) {
+                    if (is_good(x, y)) {
+                        free_cell_amount++;
+                    }
+                }
+            }
+
+            var k = Random.int(0, free_cell_amount - 1);
+            var i = 0;
+            for (x in x_start...x_end) {
+                for (y in y_start...y_end) {
+                    if (is_good(x, y)) {
+                        if (i == k) {
+                            out.x = x;
+                            out.y = y;
+                            return out;
+                        }
+                        i++;
+                    }
+                }
+            }
+
+            trace("random_cell_in_card() failed to find a free cell!");
+            return out;
+        }
+
+
+        // Check for paths here and delete walls randomly until there's a path
+        // from player to every free cell on card
+        var max_loops = card_width * card_height;
+        var path_exists = false;
+        var loop_number = 0;
+        while (!path_exists) {
+            if (loop_number > max_loops) {
+                break;
+            }
+
+            path_exists = true;
+
+            for (i in 0...card_width) {
+                if (!path_exists) {
+                    break;
+                }
+                for (j in 0...card_height) {
+                    var x = card.x * card_width + i;
+                    var y = card.y * card_height + j;
+                    if (!walls[x][y]) {
+                        var path = a_star(player.x, player.y, x, y, true);
+                        if (path.length == 0) {
+                            path_exists = false;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!path_exists) {
+                var random_wall = random_cell_in_card(card.x, card.y, function(x, y) { return walls[x][y]; });
+                if (random_wall.x == -1) {
+                    break;
+                } else {
+                    walls[random_wall.x][random_wall.y] = false;
+                }
+            }
+            
+            loop_number++;
+        }
+
+        //TODO: make a better formula for item and dude values based on card level(currently simply linear)
+        if (card.type == CardType_Dude) {
+            card.completed = false;
+
+            var number_of_dudes: Int;
+            var one_dude = Random.chance(75);
+            if (one_dude) {
+                number_of_dudes = 1;
+            } else {
+                number_of_dudes = 2;
+            }
+            while (number_of_dudes > 0) {
+                number_of_dudes--;
+
+                // Spawn dude
+                var dude = new Dude();
+                card.my_dudes.push(dude);
+                var free_map = get_free_map(false);
+                var free_cell = random_cell_in_card(card.x, card.y, function(x, y) { return free_map[x][y]; });
+                dude.x = free_cell.x;
+                dude.y = free_cell.y;
+                dude.real_x = dude.x * tilesize;
+                dude.real_y = dude.y * tilesize;
+                update_dude_info(dude);
+                dude.hp_max = Std.int(Math.max(1, Math.ceil(card_level * 1.4 / number_of_dudes)));
+                dude.hp = dude.hp_max;
+            }
+        } else if (card.type == CardType_Treasure || card.type == CardType_Weapon) {
+            function spawn_item(bad_x = -1, bad_y = -1) {            
+                var item = new Item();
+                var free_cell = random_cell_in_card(card.x, card.y, function(x, y) { return !walls[x][y]; });
+                item.x = free_cell.x;
+                item.y = free_cell.y;
+                if (card.type == CardType_Weapon) {
+                    item.type = ItemType_Weapon;
+                } else {
+                    item.type = random_enum(ItemType, 2);
+                }
+
+                if (default_item_type != null) {
+                    item.type = default_item_type;
+                }
+
+                item.info += '\nI am ${item.type}!';
+
+                if (item.type == ItemType_Consumable) {
+                    item.consumable_type = random_enum(ConsumableType, 1);
+                    if (default_consumable_type != null) {
+                        item.consumable_type = default_consumable_type;
+                    }
+                    item.value = 2 * card_level;
+                    item.tile = Tiles.Potion;
+                    item.name = "Potion";
+                } else if (item.type == ItemType_Armor) {
+                    item.armor_type = random_enum(ArmorType, 1);
+                    if (default_armor_type != null) {
+                        item.consumable_type = default_armor_type;
+                    }
+                    item.value = Std.int(Random.float(0.8, 1.2) * card_level);
+                    if (item.value == 0) {
+                        item.value = 1;
+                    }
+                    item.value_max = item.value;
+                    item.name = "Armor";
+                    switch (item.armor_type) {
+                        case ArmorType_Chest: item.tile = Tiles.Chest;
+                        case ArmorType_Head: item.tile = Tiles.Head;
+                        case ArmorType_Legs: item.tile = Tiles.Legs;
+                        default: item.tile = Tiles.Wilhelm;
+                    }
+                } else if (item.type == ItemType_Weapon) {
+                    item.weapon_type = random_enum(WeaponType, 1);
+                    if (default_weapon_type != null) {
+                        item.weapon_type = default_weapon_type;
+                    }
+
+                    item.name = "Weapon";
+                    switch (item.weapon_type) {
+                        case WeaponType_Sword: item.value = Math.ceil((2 * card_level) * (1 + Random.float(-0.2, 0.2)));
+                        case WeaponType_Spear: item.value = Math.ceil((1 * card_level) * (1 + Random.float(-0.2, 0.2)));
+                        case WeaponType_Bow: item.value = Math.ceil((1.5 * card_level) * (1 + Random.float(-0.2, 0.2)));
+                        default: item.value = 0;
+                    }
+                    switch (item.weapon_type) {
+                        case WeaponType_Sword: item.tile = Tiles.Sword;
+                        case WeaponType_Spear: item.tile = Tiles.Spear;
+                        case WeaponType_Bow: item.tile = Tiles.Bow;
+                        default: item.tile = Tiles.Wilhelm;
+                    }
+                } else if (item.type == ItemType_Arrows) {
+                    item.amount = Random.int(7, 11);
+                    item.tile = Tiles.Arrows;
+                    item.name = "Arrows";
+                } else if (item.type == ItemType_Bomb) {
+                    item.tile = Tiles.Bomb;
+                    item.name = "Bomb";
+                }
+                walls[item.x][item.y] = false;
+                
+                return item;
+            }
+
+            var item = spawn_item();
+            if (active_arcana == ArcanaType_Temperance) {
+                // Temperance effect: spawn another item with a 50% chance
+                if (Random.chance(50)) {
+                    spawn_item(item.x, item.y);
+                }
+
+                arcana_timer--;
+                if (arcana_timer <= 0) {
+                    active_arcana = null;
+                }
+            }
+
+        } else if (card.type == CardType_Arcana) {
+            card.arcana = random_enum(ArcanaType, 1);
+            if (default_arcana_type != null) {
+                card.arcana = default_arcana_type;
+            }
+
+            // remove wall at activation cell
+            walls[card.x * card_width + 1][card.y * card_height + 2] = false;
+        }
+    }
+
+    function serialize(entity:Dynamic) {
+        var fields = Type.getInstanceFields(Type.getClass(entity));
+        var fields_string = "";
+        for (f in fields) {
+            var field = Std.string(Reflect.field(entity, f));
+            if (field.indexOf('function') != -1) {
+                continue;
+            }
+            var enum_type = Type.resolveEnum(field.split('_')[0]);
+            if (enum_type != null) {
+                // for enums record it's index
+                var enums = Type.allEnums(enum_type);
+                for (i in 0...enums.length) {
+                    if (Std.string(enums[i]) == field) {
+                        // enumname_enumindex
+                        fields_string += f + '=' + field.split('_')[0] + '_' + i + '|';
+                        break;
+                    }
+                }
+            } else {
+                fields_string += f + '=' + field + '|';
+            }
+        }
+        return fields_string;
+    }
+
+    function unserialize(entity:Dynamic, fields_string:String) {
+        var fields = fields_string.split('|');
+        fields.splice(fields.length - 1, 1);
+        for (f in fields) {
+            var pair = f.split('=');
+            if ((~/^\d+$/).match(pair[0])) {
+                // Number
+                Reflect.setField(entity, pair[0], Std.parseFloat(pair[1]));
+            } else if (pair[1] == 'false') {
+                // Bool
+                Reflect.setField(entity, pair[0], false);
+            } else if (pair[1] == 'true') {
+                // Bool
+                Reflect.setField(entity, pair[0], true);
+            } else if (Type.resolveEnum(pair[1].split('_')[0]) != null) {
+                // Enum
+                var enum_type = Type.resolveEnum(pair[1].split('_')[0]);
+                var enum_index = Std.parseInt(pair[1].split('_')[1]);
+                var enum_value = Type.allEnums(enum_type)[enum_index];
+                Reflect.setField(entity, pair[0], enum_value);
+            } else if (pair[1].indexOf('[') != -1) {
+                // Array member serialization is not supported
+                Reflect.setField(entity, pair[0], new Array());
+            } else {
+                // String
+                Reflect.setField(entity, pair[0], pair[1]);
+            }
+        }
     }
 
     function do_arcana_magic(type: ArcanaType) {
@@ -342,9 +669,9 @@ class Game {
             case ArcanaType_None:
 
             case ArcanaType_Fool: {
-                make_message("Next 5 cards are nothing cards");
-                arcana_timer = 5;
+
             }
+
             case ArcanaType_Strength: {
                 make_message("Next 5 cards are weapon cards");
                 arcana_timer = 5;
@@ -480,298 +807,6 @@ class Game {
 
     function update_dude_info(dude: Dude) {
         dude.info = '${dude.name}\n${dude.hp}/${dude.hp_max}';
-    }
-
-    function serialize(entity:Dynamic) {
-        var fields = Type.getInstanceFields(Type.getClass(entity));
-        var fields_string = "";
-        for (f in fields) {
-            var field = Std.string(Reflect.field(entity, f));
-            if (field.indexOf('function') != -1) {
-                continue;
-            }
-            var enum_type = Type.resolveEnum(field.split('_')[0]);
-            if (enum_type != null) {
-                // for enums record it's index
-                var enums = Type.allEnums(enum_type);
-                for (i in 0...enums.length) {
-                    if (Std.string(enums[i]) == field) {
-                        // enumname_enumindex
-                        fields_string += f + '=' + field.split('_')[0] + '_' + i + '|';
-                        break;
-                    }
-                }
-            } else {
-                fields_string += f + '=' + field + '|';
-            }
-        }
-        return fields_string;
-    }
-
-    function unserialize(entity:Dynamic, fields_string:String) {
-        var fields = fields_string.split('|');
-        fields.splice(fields.length - 1, 1);
-        for (f in fields) {
-            var pair = f.split('=');
-            if ((~/^\d+$/).match(pair[0])) {
-                // Number
-                Reflect.setField(entity, pair[0], Std.parseFloat(pair[1]));
-            } else if (pair[1] == 'false') {
-                // Bool
-                Reflect.setField(entity, pair[0], false);
-            } else if (pair[1] == 'true') {
-                // Bool
-                Reflect.setField(entity, pair[0], true);
-            } else if (Type.resolveEnum(pair[1].split('_')[0]) != null) {
-                // Enum
-                var enum_type = Type.resolveEnum(pair[1].split('_')[0]);
-                var enum_index = Std.parseInt(pair[1].split('_')[1]);
-                var enum_value = Type.allEnums(enum_type)[enum_index];
-                Reflect.setField(entity, pair[0], enum_value);
-            } else if (pair[1].indexOf('[') != -1) {
-                // Array member serialization is not supported
-                Reflect.setField(entity, pair[0], new Array());
-            } else {
-                // String
-                Reflect.setField(entity, pair[0], pair[1]);
-            }
-        }
-    }
-
-    function reset_card(card: Card) {
-        // Remove items on card
-        var removed_items = new Array<Item>();
-        for (item in Entity.get(Item)) {
-            if (item.on_ground && Std.int(item.x / card_width) == card.x && Std.int(item.y / card_height) == card.y) {
-                removed_items.push(item);
-            }
-        }
-        for (item in removed_items) {
-            item.delete();
-        }
-        // Remove dudes on card
-        var removed_dudes = new Array<Dude>();
-        for (dude in Entity.get(Dude)) {
-            if (Std.int(dude.x / card_width) == card.x && Std.int(dude.y / card_height) == card.y) {
-                removed_dudes.push(dude);
-            }
-        }
-        for (dude in removed_dudes) {
-            dude.delete();
-        }
-        card.covered = true;
-        card.visited = false;
-        card.arcana_activated = false;
-        card.turn_age = 0;
-        card.update_age = 0;
-        card.completed = true; // only used for dude card type
-        card.my_dudes.splice(0, card.my_dudes.length);
-    }
-
-    function generate_card(card:Card) {
-        var k = Random.int(0, Walls.all.length - 1);
-        var walls_preset = Walls.all[k];
-        for (i in 0...card_width) {
-            for (j in 0...card_height) {
-                walls[card.x * card_width + i][card.y * card_height + j] = (walls_preset[j][i] == 1);
-            }
-        }
-
-        function random_cell_in_card(card_x: Int, card_y: Int, is_good: Int->Int->Bool): IntVector2 {
-            var out: IntVector2 = {x: -1, y: -1};
-            var x_start = card.x * card_width;
-            var x_end = x_start + card_width;
-            var y_start = card.y * card_height;
-            var y_end = y_start + card_height;
-            
-            var free_cell_amount = 0;
-            for (x in x_start...x_end) {
-                for (y in y_start...y_end) {
-                    if (is_good(x, y)) {
-                        free_cell_amount++;
-                    }
-                }
-            }
-
-            var k = Random.int(0, free_cell_amount - 1);
-            var i = 0;
-            for (x in x_start...x_end) {
-                for (y in y_start...y_end) {
-                    if (is_good(x, y)) {
-                        if (i == k) {
-                            out.x = x;
-                            out.y = y;
-                            return out;
-                        }
-                        i++;
-                    }
-                }
-            }
-
-            trace("random_cell_in_card() failed to find a free cell!");
-            return out;
-        }
-
-
-        // Check for paths here and delete walls randomly until there's a path
-        // from player to every free cell on card
-        var max_loops = card_width * card_height;
-        var path_exists = false;
-        var loop_number = 0;
-        while (!path_exists) {
-            if (loop_number > max_loops) {
-                break;
-            }
-
-            path_exists = true;
-
-            for (i in 0...card_width) {
-                if (!path_exists) {
-                    break;
-                }
-                for (j in 0...card_height) {
-                    var x = card.x * card_width + i;
-                    var y = card.y * card_height + j;
-                    if (!walls[x][y]) {
-                        var path = a_star(player.x, player.y, x, y, true);
-                        if (path.length == 0) {
-                            path_exists = false;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (!path_exists) {
-                var random_wall = random_cell_in_card(card.x, card.y, function(x, y) { return walls[x][y]; });
-                if (random_wall.x == -1) {
-                    break;
-                } else {
-                    walls[random_wall.x][random_wall.y] = false;
-                }
-            }
-            
-            loop_number++;
-        }
-
-        //TODO: make a better formula for item and dude values based on card level(currently simply linear)
-        if (card.type == CardType_Dude) {
-            card.completed = false;
-
-            var number_of_dudes = Random.int(1, 2);
-            while (number_of_dudes > 0) {
-                number_of_dudes--;
-
-                // Spawn dude
-                var dude = new Dude();
-                card.my_dudes.push(dude);
-                var free_map = get_free_map(false);
-                var free_cell = random_cell_in_card(card.x, card.y, function(x, y) { return free_map[x][y]; });
-                dude.x = free_cell.x;
-                dude.y = free_cell.y;
-                dude.real_x = dude.x * tilesize;
-                dude.real_y = dude.y * tilesize;
-                update_dude_info(dude);
-                dude.hp_max = Std.int(Math.max(1, Math.ceil(card_level * 1.4 / number_of_dudes)));
-                dude.hp = dude.hp_max;
-            }
-        } else if (card.type == CardType_Treasure || card.type == CardType_Weapon) {
-            function spawn_item(bad_x = -1, bad_y = -1) {            
-                var item = new Item();
-                var free_cell = random_cell_in_card(card.x, card.y, function(x, y) { return !walls[x][y]; });
-                item.x = free_cell.x;
-                item.y = free_cell.y;
-                if (card.type == CardType_Weapon) {
-                    item.type = ItemType_Weapon;
-                } else {
-                    item.type = random_enum(ItemType, 2);
-                }
-
-                if (default_item_type != null) {
-                    item.type = default_item_type;
-                }
-
-                item.info += '\nI am ${item.type}!';
-
-                if (item.type == ItemType_Consumable) {
-                    item.consumable_type = random_enum(ConsumableType, 1);
-                    if (default_consumable_type != null) {
-                        item.type = default_consumable_type;
-                    }
-                    item.value = 2 * card_level;
-                    item.tile = Tiles.Potion;
-                    item.name = "Potion";
-                } else if (item.type == ItemType_Armor) {
-                    item.armor_type = random_enum(ArmorType, 1);
-                    if (default_armor_type != null) {
-                        item.consumable_type = default_armor_type;
-                    }
-                    item.value = Std.int(Random.float(0.8, 1.2) * card_level);
-                    if (item.value == 0) {
-                        item.value = 1;
-                    }
-                    item.value_max = item.value;
-                    item.name = "Armor";
-                    switch (item.armor_type) {
-                        case ArmorType_Chest: item.tile = Tiles.Chest;
-                        case ArmorType_Head: item.tile = Tiles.Head;
-                        case ArmorType_Legs: item.tile = Tiles.Legs;
-                        default: item.tile = Tiles.Wilhelm;
-                    }
-                } else if (item.type == ItemType_Weapon) {
-                    item.weapon_type = random_enum(WeaponType, 1);
-                    if (default_weapon_type != null) {
-                        item.weapon_type = default_weapon_type;
-                    }
-
-                    item.name = "Weapon";
-                    switch (item.weapon_type) {
-                        case WeaponType_Sword: item.value = 2 * card_level;
-                        case WeaponType_Spear: item.value = 1 * card_level;
-                        case WeaponType_Bow: item.value = 1 * card_level;
-                        default: item.value = 0;
-                    }
-                    switch (item.weapon_type) {
-                        case WeaponType_Sword: item.tile = Tiles.Sword;
-                        case WeaponType_Spear: item.tile = Tiles.Spear;
-                        case WeaponType_Bow: item.tile = Tiles.Bow;
-                        default: item.tile = Tiles.Wilhelm;
-                    }
-                } else if (item.type == ItemType_Arrows) {
-                    item.amount = Random.int(7, 11);
-                    item.tile = Tiles.Arrows;
-                    item.name = "Arrows";
-                } else if (item.type == ItemType_Bomb) {
-                    item.tile = Tiles.Bomb;
-                    item.name = "Bomb";
-                }
-                walls[item.x][item.y] = false;
-                
-                return item;
-            }
-
-            var item = spawn_item();
-            if (active_arcana == ArcanaType_Temperance) {
-                // Temperance effect: spawn another item with a 50% chance
-                if (Random.chance(50)) {
-                    spawn_item(item.x, item.y);
-                }
-
-                arcana_timer--;
-                if (arcana_timer <= 0) {
-                    active_arcana = null;
-                }
-            }
-
-        } else if (card.type == CardType_Arcana) {
-            card.arcana = random_enum(ArcanaType, 1);
-            if (default_arcana_type != null) {
-                card.arcana = default_arcana_type;
-            }
-
-            // remove wall at activation cell
-            walls[card.x * card_width + 1][card.y * card_height + 2] = false;
-        }
     }
 
     // each bool tells what to filter out
@@ -1028,7 +1063,6 @@ class Game {
 
                 var card_color = 0;
                 switch (card.type) {
-                    case CardType_Nothing: card_color = Col.BROWN;
                     case CardType_Dude: card_color = Col.RED;
                     case CardType_Treasure: card_color = Col.YELLOW;
                     case CardType_Weapon: card_color = Col.GREEN;
@@ -1044,7 +1078,7 @@ class Game {
                         Gfx.fill_box(x * card_width * tilesize, y * card_height * tilesize,
                             card_width * tilesize, card_height * tilesize, card_color, 0.5);
                     }
-                    if (DRAW_CARD_LEVEL && card.type != CardType_Nothing) {
+                    if (DRAW_CARD_LEVEL) {
                         Text.display(x * card_width * tilesize, y * card_height * tilesize, '${card.level}', Col.WHITE);
                         Text.display((x + 1) * card_width * tilesize - tilesize / 2, (y + 1) * card_height * tilesize - tilesize, 
                             '${card.level}', Col.WHITE);
@@ -1073,7 +1107,7 @@ class Game {
                     card.just_updated_timer--;
 
                     Gfx.fill_circle((x * card_width + 1.5) * tilesize, (y * card_height + 2.5) * tilesize, 
-                            card.just_updated_timer * 1.5, Col.YELLOW, 0.5);
+                        card.just_updated_timer * 1.5, Col.YELLOW, 0.5);
                 }
             }
         }
@@ -1611,7 +1645,7 @@ class Game {
             var put_in_inventory = false;
             var put_in_trash = false;
             var slot_index = -1;
-            var explosion = false;
+            var consumable_used = false;
 
             if (Math.point_box_intersect(Mouse.x, Mouse.y, trash_x, trash_y, inventory_slot_size, inventory_slot_size)) {
                 // Trash item
@@ -1710,7 +1744,7 @@ class Game {
                     && Math.abs(drop_y - player.y) < 2;
 
                     if (walls[drop_x][drop_y] || dropped_on_dude) {
-                        explosion = true;
+                        consumable_used = true;
                     }
                 } else {
                     can_drop = !out_of_bounds(drop_x, drop_y) 
@@ -1731,6 +1765,7 @@ class Game {
                             player.hp = player.hp_max;
                         }
                         item.delete();
+                        consumable_used = true;
                     }
                 }
                 function blow_up(item) {
@@ -1779,7 +1814,7 @@ class Game {
 
 
             dragged_item = null;
-            if (explosion) {
+            if (consumable_used) {
                 state = GameState_PlayerVisual;
             } else {
                 state = GameState_PlayerTurn;
@@ -2273,9 +2308,9 @@ class Game {
         //  CARD UPDATE
         //
 
-        // Start updating cards when more than 30% cards are uncovered
-        var uncovered_percentage = cards_uncovered / total_cards;
-        if (uncovered_percentage > 0.3 && UPDATE_CARDS) {
+        // Start updating cards when less than 5 / 15 cards are covered
+        var uncovered_percentage = cards_covered / total_cards;
+        if (uncovered_percentage < 5 / 15 && UPDATE_CARDS) {
             card_update_timer--;
 
             if (active_arcana == ArcanaType_Empress) {
@@ -2288,8 +2323,8 @@ class Game {
                 }
             }
 
-            if (uncovered_percentage > 0.7) {
-                // If more than 70% cards are uncovered, update faster
+            if (uncovered_percentage < 3 / 15) {
+                // If only 1-2 cards left, update faster
                 card_update_timer--;
             }
             if (card_update_timer <= 0) {
@@ -2346,7 +2381,7 @@ class Game {
                     generate_card(updated_card);
 
                     updated_card.level = card_level;
-                    cards_uncovered--;
+                    cards_covered++;
 
                     card_level_increment_timer--;
                     if (card_level_increment_timer <= 0) {
@@ -2397,7 +2432,7 @@ class Game {
             state = GameState_PlayerTurn;
             state_timer = 0;
             cards[flipped_card.x][flipped_card.y].covered = false;
-            cards_uncovered++;
+            cards_covered--;
         }
     }
 

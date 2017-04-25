@@ -1,4 +1,4 @@
-remove nothing cards(keep a small number of cards on the field instead 15-25%)
+add new chance system to consumables/items/weapons
 
 card replace animations
 make items/armor more rare and crappier at the start
@@ -8,7 +8,6 @@ implement all arcanas
 test all arcanas
 
 DONE:
-
 
 ---------------------------------------------------------------------------------------------------
 MILESTONES
@@ -44,7 +43,7 @@ NOTES
 watch out for visual timers going over 1.0, maybe rework
 
 CARD MAGIC
-$*0FOOL        next 5 cards are nothing 
+0FOOL        
 $*1MAGICIAN    reroll all covered cards(doesnt advance level counter) 
 $*2PRIESTESS   heals you to max health/increases your max health 
 $*3EMPRESS     card update accelerates for the next 10 cards
