@@ -32,6 +32,7 @@ enum WeaponType {
 	WeaponType_Sword;
 	WeaponType_Spear;
 	WeaponType_Bow;
+	WeaponType_Laser;
 }
 
 @:publicFields
@@ -87,8 +88,8 @@ class Player extends Entity {
 	var dx = 0;
 	var dy = 0;
 
-	var hp = 5;
-	var hp_max = 5;
+	var hp = 10;
+	var hp_max = 10;
 	var armor = 0;
 
 	var weapon = WeaponType_None;

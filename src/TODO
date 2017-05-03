@@ -1,7 +1,3 @@
-add new chance system to consumables/items/weapons
-
-card replace animations
-make items/armor more rare and crappier at the start
 more items
 
 implement all arcanas
@@ -9,11 +5,12 @@ test all arcanas
 
 DONE:
 
+
 ---------------------------------------------------------------------------------------------------
 MILESTONES
 ---------------------------------------------------------------------------------------------------
 multiple enemy types
-card magic
+*card magic
 *combat system
 *loot system
 *card refreshing

@@ -99,8 +99,8 @@ class Game {
 
     static var default_card_type = null;
     static var default_arcana_type = null;
-    static var default_item_type = null;
-    static var default_weapon_type = null;
+    static var default_item_type = ItemType_Weapon;
+    static var default_weapon_type = WeaponType_Laser;
     static var default_armor_type = null;
     static var default_consumable_type = null;
 
@@ -236,7 +236,7 @@ class Game {
     }
 
     var chance_history = new ObjectMap<Dynamic, Array<Int>>();
-    function get_chance(enum_type: Dynamic, enums: Array<Dynamic>, chances: Array<Chance>) {
+    function get_chance(enum_type: Dynamic, enums: Array<Dynamic>, chances: Array<Chance>): Dynamic {
         var chances_incremented = new Vector<Int>(chances.length);
         for (i in 0...chances.length) {
             chances_incremented[i] = chances[i].val;
@@ -261,11 +261,11 @@ class Game {
         for (i in 0...chances.length) {
             if (i != 0) {
                 // If there are too many cards of type, halve the chances
-                if (counts[i] / history.length > chances[i].max) {
+                if (counts[i] / history.length > chances[i].max && chances[i].max != 0) {
                     chances_incremented[i] = Math.floor(chances_incremented[i] / 2);
                 }
                 // If there are too little cards of type, double the chances
-                if (counts[i] / history.length < chances[i].min) {
+                if (counts[i] / history.length < chances[i].min && chances[i].min != 0) {
                     chances_incremented[i] = Math.ceil(chances_incremented[i] * 2);
                 }
             }
@@ -327,18 +327,17 @@ class Game {
         } else if (pending_treasure_cards > 0) {
             pending_treasure_cards--;
 
-            if (Random.chance(20)) {
-                type = CardType_Weapon;
+            if (Random.chance(70)) {
+                if (Random.chance(20)) {
+                    type = CardType_Weapon;
+                } else {
+                    type = CardType_Treasure;
+                }
             } else {
-                type = CardType_Treasure;
+                type = get_chance(CardType, card_type_order, card_type_chances);
             }
         } else {
             type = get_chance(CardType, card_type_order, card_type_chances);
-        }
-
-        var enums = Type.allEnums(CardType);
-        for (i in 0...enums.length) {
-            trace(enums[i]);
         }
 
         return type;
@@ -374,27 +373,42 @@ class Game {
         card.my_dudes.splice(0, card.my_dudes.length);
     }
 
-    // var item_chances_default = [
-    // CardType_None => 0,
-    // CardType_Arcana => 5,
-    // CardType_Weapon => 2,
-    // CardType_Treasure => 3,
-    // CardType_Dude => 90,
-    // ];
-    // var consumable_chances_default = [
-    // CardType_None => 0,
-    // CardType_Arcana => 5,
-    // CardType_Weapon => 2,
-    // CardType_Treasure => 3,
-    // CardType_Dude => 90,
-    // ];
-    // var consumable_chances_default = [
-    // CardType_None => 0,
-    // CardType_Arcana => 5,
-    // CardType_Weapon => 2,
-    // CardType_Treasure => 3,
-    // CardType_Dude => 90,
-    // ];
+    var treasure_order = [
+    ItemType_Consumable,
+    ItemType_Bomb,
+    ItemType_Arrows,
+    ];
+    var treasure_chances: Array<Chance> = [
+    {val: 4, min: 0, max: 5},
+    {val: 4, min: 0, max: 5},
+    {val: 2, min: 0, max: 5},
+    ];
+
+    var weapon_order = [
+    WeaponType_Sword,
+    WeaponType_Spear,
+    WeaponType_Bow,
+    WeaponType_Laser,
+    ];
+    var weapon_chances: Array<Chance> = [
+    {val: 4, min: 0, max: 5},
+    {val: 4, min: 0, max: 5},
+    {val: 4, min: 0, max: 5},
+    {val: 1, min: 0, max: 2},
+    ];
+
+    var armor_order = [
+    ArmorType_None,
+    ArmorType_Chest,
+    ArmorType_Legs,
+    ArmorType_Head,
+    ];
+    var armor_chances: Array<Chance> = [
+    {val: 4, min: 0, max: 5},
+    {val: 4, min: 0, max: 5},
+    {val: 4, min: 0, max: 5},
+    {val: 4, min: 0, max: 5},
+    ];
 
     function generate_card(card:Card) {
         var k = Random.int(0, Walls.all.length - 1);
@@ -487,7 +501,7 @@ class Game {
             card.completed = false;
 
             var number_of_dudes: Int;
-            var one_dude = Random.chance(75);
+            var one_dude = Random.chance(80);
             if (one_dude) {
                 number_of_dudes = 1;
             } else {
@@ -506,7 +520,11 @@ class Game {
                 dude.real_x = dude.x * tilesize;
                 dude.real_y = dude.y * tilesize;
                 update_dude_info(dude);
-                dude.hp_max = Std.int(Math.max(1, Math.ceil(card_level * 1.4 / number_of_dudes)));
+                var min_hp = 2;
+                if (number_of_dudes > 1) {
+                    min_hp = 1;
+                }
+                dude.hp_max = Std.int(Math.max(min_hp, Math.ceil(card_level * 2.4 / number_of_dudes)));
                 dude.hp = dude.hp_max;
             }
         } else if (card.type == CardType_Treasure || card.type == CardType_Weapon) {
@@ -518,7 +536,7 @@ class Game {
                 if (card.type == CardType_Weapon) {
                     item.type = ItemType_Weapon;
                 } else {
-                    item.type = random_enum(ItemType, 2);
+                    item.type = get_chance(ItemType, treasure_order, treasure_chances);
                 }
 
                 if (default_item_type != null) {
@@ -536,7 +554,7 @@ class Game {
                     item.tile = Tiles.Potion;
                     item.name = "Potion";
                 } else if (item.type == ItemType_Armor) {
-                    item.armor_type = random_enum(ArmorType, 1);
+                    item.armor_type = get_chance(ArmorType, armor_order, armor_chances);
                     if (default_armor_type != null) {
                         item.consumable_type = default_armor_type;
                     }
@@ -553,7 +571,7 @@ class Game {
                         default: item.tile = Tiles.Wilhelm;
                     }
                 } else if (item.type == ItemType_Weapon) {
-                    item.weapon_type = random_enum(WeaponType, 1);
+                    item.weapon_type = get_chance(WeaponType, weapon_order, weapon_chances);
                     if (default_weapon_type != null) {
                         item.weapon_type = default_weapon_type;
                     }
@@ -563,6 +581,10 @@ class Game {
                         case WeaponType_Sword: item.value = Math.ceil((2 * card_level) * (1 + Random.float(-0.2, 0.2)));
                         case WeaponType_Spear: item.value = Math.ceil((1 * card_level) * (1 + Random.float(-0.2, 0.2)));
                         case WeaponType_Bow: item.value = Math.ceil((1.5 * card_level) * (1 + Random.float(-0.2, 0.2)));
+                        case WeaponType_Laser: {
+                            item.value = Math.ceil((5 * card_level) * (1 + Random.float(-0.2, 0.2)));
+                            item.value_max = item.value;
+                        }
                         default: item.value = 0;
                     }
                     switch (item.weapon_type) {
@@ -668,9 +690,7 @@ class Game {
         switch (type) {
             case ArcanaType_None:
 
-            case ArcanaType_Fool: {
-
-            }
+            // case ArcanaType_Fool:
 
             case ArcanaType_Strength: {
                 make_message("Next 5 cards are weapon cards");
@@ -758,7 +778,7 @@ class Game {
                 }
                 make_message("All walls were destroyed");
             }
-            case ArcanaType_Fortune:
+            // case ArcanaType_Fortune:
             case ArcanaType_Justice: {
                 var player_card = card_at_position(player.x, player.y);
 
@@ -783,14 +803,16 @@ class Game {
                 arcana_timer = 5;
                 make_message("Cards might have more items for some time");
             }
-            case ArcanaType_Devil:
-            case ArcanaType_Tower:
-            case ArcanaType_Moon:
+            // case ArcanaType_Devil:
+            // case ArcanaType_Tower:
+            // case ArcanaType_Moon:
             case ArcanaType_Sun: {
                 arcana_timer = 10;
             }
             case ArcanaType_Judgement:
-            default: trace("unhandled case in do_arcana_magic()");
+            default: {
+                make_message("This arcana is not implemented");
+            }
         }
         active_arcana = type;
         if (arcana_timer != 0) {
@@ -1438,7 +1460,6 @@ class Game {
             }
         }
 
-
         // Item interactions
         if (state == GameState_PlayerTurn) {
             // Drag start
@@ -1449,7 +1470,7 @@ class Game {
                 if (Mouse.x < inventory_x - 1) {
                     // Map items
                     for (item in Entity.get(Item)) {
-                        if (item.x == x && item.y == y) {
+                        if (item.on_ground && item.x == x && item.y == y) {
                             dragged_item = item;
                             drag_dx = Mouse.x - x * tilesize;
                             drag_dy = Mouse.y - y * tilesize;
@@ -1483,8 +1504,9 @@ class Game {
                 }
             }
 
-            // Instant item actions
-            if (Mouse.right_click()) {
+            // Instant item actions(check state to prevent both drag and pick-up at the same time)
+            if (Mouse.right_click() && state != GameState_ItemDrag) {
+
                 var x = Std.int(Mouse.x / tilesize);
                 var y = Std.int(Mouse.y / tilesize);
 
@@ -1864,6 +1886,10 @@ class Game {
                     timer_max = bow_visual_timer_max;
                     attack_dst = Std.int(Math.max(map_width, map_height)) * tilesize;
                 }
+                case WeaponType_Laser: {
+                    timer_max = weapon_visual_timer_max;
+                    attack_dst = Std.int(Math.max(map_width, map_height)) * tilesize;
+                }
             }
 
             var attack_progress = 0.5 - Math.abs(state_timer / timer_max - 0.5);
@@ -1914,6 +1940,31 @@ class Game {
                         state_timer = 1000000;
                     }
                 }
+                case WeaponType_Laser: {
+                    var x1 = (player.x + 0.5) * tilesize;
+                    var y1 = (player.y + 0.5) * tilesize;
+                    var x2: Float;
+                    if (player.dx < 0) {
+                        x2 = 0;
+                    } else if (player.dx > 0) {
+                        x2 = map_width * tilesize;
+                    } else {
+                        x2 = x1;
+                    }
+                    var y2: Float;
+                    if (player.dy < 0) {
+                        y2 = 0;
+                    } else if (player.dy > 0) {
+                        y2 = map_height * tilesize;
+                    } else {
+                        y2 = y1;
+                    }
+
+                    var old_thickness = Gfx.line_thickness;
+                    Gfx.line_thickness = 10;
+                    Gfx.draw_line(x1, y1, x2, y2, Col.RED);
+                    Gfx.line_thickness = old_thickness;
+                }
             }
         }
 
@@ -1951,6 +2002,7 @@ class Game {
                 case WeaponType_Sword: attack_distance = 1;
                 case WeaponType_Spear: attack_distance = 2;
                 case WeaponType_Bow: attack_distance = Std.int(Math.max(map_width, map_height));
+                case WeaponType_Laser: attack_distance = Std.int(Math.max(map_width, map_height));
             }
 
             var attack_damage = fist_damage;
@@ -1987,6 +2039,31 @@ class Game {
                             }
                             break;
                         }
+                    }
+                }
+            }
+
+            // Discharge laser
+            if (player.weapon == WeaponType_Laser) {
+                for (i in 0...inventory_slots) {
+                    if (inventory[i] != null && inventory[i].type == ItemType_Weapon && inventory[i].weapon_type == WeaponType_Laser) {
+                        if (player.attacked) {
+                            inventory[i].value = 0;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Recharge lasers
+        for (item in Entity.get(Item)) {
+            if (item.type == ItemType_Weapon && item.weapon_type == WeaponType_Laser) {
+                if (item.value != item.value_max && Random.chance(30)) {
+                    // Lasers on the ground also recharge
+                    if (item.on_ground) {
+                        item.value++;
+                    } else if (!player.attacked) {
+                        item.value++;
                     }
                 }
             }
