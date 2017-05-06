@@ -100,7 +100,7 @@ class Game {
 
     static var default_card_type = null;
     static var default_arcana_type = null;
-    static var default_item_type = ItemType_Consumable;
+    static var default_item_type = null;
     static var default_weapon_type = null;
     static var default_armor_type = null;
     static var default_consumable_type = null;
@@ -1474,75 +1474,59 @@ class Game {
             }
         }
 
-        // Item interactions
-        // add +e action here
-        if (state == GameState_PlayerTurn) {
-            // Drag start
-            if (Mouse.left_click()) {
-                var x = Std.int(Mouse.x / tilesize);
-                var y = Std.int(Mouse.y / tilesize);
+        function consume_potion(potion) {
+            player.hp += potion.value;
+            if (player.hp > player.hp_max) {
+                player.hp = player.hp_max;
+            }
+            potion.delete();
+        }
 
-                if (Mouse.x < inventory_x - 1) {
-                    // Map items
-                    for (item in Entity.get(Item)) {
-                        if (item.on_ground && item.x == x && item.y == y) {
-                            dragged_item = item;
-                            drag_dx = Mouse.x - x * tilesize;
-                            drag_dy = Mouse.y - y * tilesize;
-                            break;
-                        }
-                    }
-                    if (dragged_item != null
-                        && Math.abs(dragged_item.x - player.x) < 2
-                        && Math.abs(dragged_item.y - player.y) < 2) 
-                    {
-                        state = GameState_ItemDrag;
-                    } else {
-                        dragged_item = null;
-                    }
-                } else {
-                    // Inventory items
-                    for (i in 0...inventory_slots) {
-                        if (inventory[i] != null
-                            && Math.point_box_intersect(Mouse.x, Mouse.y, inventory_x, inventory_y + i * inventory_slot_size,
-                                inventory_slot_size, inventory_slot_size)) 
-                        {
-                            state = GameState_ItemDrag;
-                            dragged_item = inventory[i];
-                            drag_dx = Mouse.x - inventory_x;
-                            drag_dy = Mouse.y - inventory_y - i * inventory_slot_size;
-                            dragged_item_inventory_slot = i;
-                            inventory[i] = null;
-                            break;
-                        }
+        // Item interactions
+        if (state == GameState_PlayerTurn) {
+            var x = Std.int(Mouse.x / tilesize);
+            var y = Std.int(Mouse.y / tilesize);
+
+            if (Mouse.x < inventory_x - 1) {
+                // Ground items
+                // left click = put into inventory or swap if weapon/armor
+                // right click = use if consumable
+                var clicked_item: Item = null;
+
+                for (item in Entity.get(Item)) {
+                    if (item.on_ground && item.x == x && item.y == y) {
+                        clicked_item = item;
+                        break;
                     }
                 }
-            }
+                if (clicked_item != null 
+                    && (Math.abs(clicked_item.x - player.x) >= 2 || Math.abs(clicked_item.y - player.y) >= 2)) 
+                {
+                    clicked_item = null;
+                }
 
-            // Instant item actions(check state to prevent both drag and pick-up at the same time)
-            if (Mouse.right_click() && state != GameState_ItemDrag) {
-
-                var x = Std.int(Mouse.x / tilesize);
-                var y = Std.int(Mouse.y / tilesize);
-
-                if (Mouse.x < inventory_x - 1) {
-                    // Map items, insert into free inventory slot or swap with item of same type or consume if holding E
-                    var clicked_item: Item = null;
-
-                    for (item in Entity.get(Item)) {
-                        if (item.on_ground && item.x == x && item.y == y) {
-                            clicked_item = item;
-                            break;
-                        }
-                    }
-                    if (clicked_item != null 
-                        && (Math.abs(clicked_item.x - player.x) >= 2 || Math.abs(clicked_item.y - player.y) >= 2)) 
-                    {
-                        clicked_item = null;
-                    }
-
-                    if (clicked_item != null) {
-                        if (clicked_item.type == ItemType_Weapon) {
+                if (clicked_item != null) {
+                    if (Mouse.left_click()) {
+                        // Drag start
+                        if (Input.pressed(Key.SHIFT)) {
+                            // Map items
+                            for (item in Entity.get(Item)) {
+                                if (item.on_ground && item.x == x && item.y == y) {
+                                    dragged_item = item;
+                                    drag_dx = Mouse.x - x * tilesize;
+                                    drag_dy = Mouse.y - y * tilesize;
+                                    break;
+                                }
+                            }
+                            if (dragged_item != null
+                                && Math.abs(dragged_item.x - player.x) < 2
+                                && Math.abs(dragged_item.y - player.y) < 2) 
+                            {
+                                state = GameState_ItemDrag;
+                            } else {
+                                dragged_item = null;
+                            }
+                        } else if (clicked_item.type == ItemType_Weapon) {
                             var equipped_weapon: Item = null;
                             var equipped_weapon_inventory_slot = 0;
 
@@ -1608,75 +1592,63 @@ class Game {
                             clicked_item.on_ground = false;
                             inventory[equipped_armor_inventory_slot] = clicked_item;
                         } else {
-                            if (Input.pressed(Key.E) && clicked_item.type == ItemType_Consumable && clicked_item.consumable_type == ConsumableType_Potion) {
-                                player.hp += clicked_item.value;
-                                if (player.hp > player.hp_max) {
-                                    player.hp = player.hp_max;
-                                }
-                                clicked_item.delete();
-                                state = GameState_PlayerVisual; // using a potion takes a turn
-                            } else {
-                                var open_slot_found = false;
+                            var open_slot_found = false;
 
-                                for (i in 0...inventory_slots) {
-                                    if (inventory[i] == null) {
-                                        equip(clicked_item);
-                                        clicked_item.on_ground = false;
-                                        inventory[i] = clicked_item;
-                                        open_slot_found = true;
-                                        break;
-                                    }
-                                }
-
-                                if (!open_slot_found) {
-                                    make_message("Inventory is full");
+                            for (i in 0...inventory_slots) {
+                                if (inventory[i] == null) {
+                                    equip(clicked_item);
+                                    clicked_item.on_ground = false;
+                                    inventory[i] = clicked_item;
+                                    open_slot_found = true;
+                                    break;
                                 }
                             }
-                        }
-                    }
-                } else {
-                    var clicked_item: Item = null;
-                    var clicked_item_inventory_slot = 0;
 
-                    // Inventory items, drop onto nearest empty cell on ground
-                    for (i in 0...inventory_slots) {
-                        if (inventory[i] != null
-                            && Math.point_box_intersect(Mouse.x, Mouse.y, inventory_x, inventory_y + i * inventory_slot_size,
-                                inventory_slot_size, inventory_slot_size)) 
-                        {
-                            clicked_item = inventory[i];
-                            clicked_item_inventory_slot = i;
-                            break;
-                        }
-                    }
-
-                    // Make a map, which is false if there's a wall/item/dude/covered card/player
-                    var free = get_free_map();
-
-                    // Drop item into a free cell near player
-                    var x: Int = 0;
-                    var y: Int = 0;
-                    function drop_item() {
-                        for (dx in -1...2) {
-                            for (dy in -1...2) {
-                                x = player.x + dx;
-                                y = player.y + dy;
-                                if (!out_of_bounds(x, y) && free[x][y]) {
-                                    unequip(clicked_item);
-                                    clicked_item.x = x;
-                                    clicked_item.y = y;
-                                    clicked_item.on_ground = true;
-                                    inventory[clicked_item_inventory_slot] = null;
-                                    return true;
-                                } 
+                            if (!open_slot_found) {
+                                make_message("Inventory is full");
                             }
                         }
-                        return false;
+                    } else if (Mouse.right_click()) {
+                        if (clicked_item.type == ItemType_Consumable && clicked_item.consumable_type == ConsumableType_Potion) {
+                            consume_potion(clicked_item);
+                            state = GameState_PlayerVisual; // using a potion takes a turn
+                        }
                     }
+                }
+            } else {
+                // Inventory item
+                // left click = drag onto ground
+                // right click = use if consumable
 
-                    var drop_success = drop_item();
-                    if (!drop_success) {
-                        make_message("Not enough space to drop item");
+                var clicked_item: Item = null;
+                var clicked_item_inventory_slot = 0;
+
+                // Inventory items, drop onto nearest empty cell on ground
+                for (i in 0...inventory_slots) {
+                    if (inventory[i] != null
+                        && Math.point_box_intersect(Mouse.x, Mouse.y, inventory_x, inventory_y + i * inventory_slot_size,
+                            inventory_slot_size, inventory_slot_size)) 
+                    {
+                        clicked_item = inventory[i];
+                        clicked_item_inventory_slot = i;
+                        break;
+                    }
+                }
+
+                if (clicked_item != null) {
+                    if (Mouse.left_click()) {
+                        state = GameState_ItemDrag;
+                        dragged_item = clicked_item;
+                        drag_dx = Mouse.x - inventory_x;
+                        drag_dy = Mouse.y - inventory_y - clicked_item_inventory_slot * inventory_slot_size;
+                        dragged_item_inventory_slot = clicked_item_inventory_slot;
+                        inventory[clicked_item_inventory_slot] = null;
+                    } else if (Mouse.right_click()) {
+                        if (clicked_item.type == ItemType_Consumable && clicked_item.consumable_type == ConsumableType_Potion) {
+                            consume_potion(clicked_item);
+                            inventory[clicked_item_inventory_slot] = null;
+                            state = GameState_PlayerVisual;
+                        }
                     }
                 }
             }
