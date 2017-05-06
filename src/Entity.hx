@@ -112,6 +112,7 @@ class Dude extends Entity {
 	static var classs = Dude;
 	var hp = 3;
 	var hp_max = 3;
+	var dmg = 0;
 	static var names = ["Dave", "Stephen", "Max", "Vinny"];
 	var name = names[Random.int(0, names.length - 1)];
 	var info = "";

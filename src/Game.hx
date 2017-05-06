@@ -96,11 +96,12 @@ class Game {
     static inline var DRAW_CARD_LEVEL = true;
     static inline var ARROW_HACK = false;
     static inline var DRAW_LOS_DEBUG = false;
+    var GOD_MODE = false;
 
     static var default_card_type = null;
     static var default_arcana_type = null;
-    static var default_item_type = ItemType_Weapon;
-    static var default_weapon_type = WeaponType_Laser;
+    static var default_item_type = ItemType_Consumable;
+    static var default_weapon_type = null;
     static var default_armor_type = null;
     static var default_consumable_type = null;
 
@@ -259,20 +260,18 @@ class Game {
         }
 
         for (i in 0...chances.length) {
-            if (i != 0) {
-                // If there are too many cards of type, halve the chances
-                if (counts[i] / history.length > chances[i].max && chances[i].max != 0) {
-                    chances_incremented[i] = Math.floor(chances_incremented[i] / 2);
-                }
-                // If there are too little cards of type, double the chances
-                if (counts[i] / history.length < chances[i].min && chances[i].min != 0) {
-                    chances_incremented[i] = Math.ceil(chances_incremented[i] * 2);
-                }
+            // If there are too many cards of type, halve the chances
+            if (counts[i] / history.length > chances[i].max && chances[i].max != 0) {
+                chances_incremented[i] = Math.floor(chances_incremented[i] / 2);
+            }
+            // If there are too little cards of type, double the chances
+            if (counts[i] / history.length < chances[i].min && chances[i].min != 0) {
+                chances_incremented[i] = Math.ceil(chances_incremented[i] * 2);
             }
         }
 
         var chance_sum = 0;
-        for (i in 1...chances.length) {
+        for (i in 0...chances.length) {
             chance_sum += chances_incremented[i];
             chances_incremented[i] = chance_sum; 
         }
@@ -290,15 +289,13 @@ class Game {
     }
 
     var card_type_order = [
-    CardType_None,
     CardType_Arcana,
     CardType_Weapon,
     CardType_Treasure,
     CardType_Dude,
     ];
     var card_type_chances: Array<Chance> = [
-    {val: 0, min: 0, max: 0}, // None
-    {val: 5, min: 0, max: 2}, // Arcana
+    {val: 8, min: 0, max: 1}, // Arcana
     {val: 2, min: 0, max: 2}, // Weapon
     {val: 3, min: 0, max: 2}, // Treasure
     {val: 90, min: 2, max: 8},// Dude
@@ -377,11 +374,13 @@ class Game {
     ItemType_Consumable,
     ItemType_Bomb,
     ItemType_Arrows,
+    ItemType_Armor,
     ];
     var treasure_chances: Array<Chance> = [
     {val: 4, min: 0, max: 5},
     {val: 4, min: 0, max: 5},
     {val: 2, min: 0, max: 5},
+    {val: 4, min: 0, max: 5},
     ];
 
     var weapon_order = [
@@ -398,13 +397,11 @@ class Game {
     ];
 
     var armor_order = [
-    ArmorType_None,
     ArmorType_Chest,
     ArmorType_Legs,
     ArmorType_Head,
     ];
     var armor_chances: Array<Chance> = [
-    {val: 4, min: 0, max: 5},
     {val: 4, min: 0, max: 5},
     {val: 4, min: 0, max: 5},
     {val: 4, min: 0, max: 5},
@@ -524,8 +521,9 @@ class Game {
                 if (number_of_dudes > 1) {
                     min_hp = 1;
                 }
-                dude.hp_max = Std.int(Math.max(min_hp, Math.ceil(card_level * 2.4 / number_of_dudes)));
+                dude.hp_max = Std.int(Math.max(min_hp, Math.ceil(card_level * (2.4 + Random.float(-0.5, 0.5)) / number_of_dudes)));
                 dude.hp = dude.hp_max;
+                dude.dmg = Std.int(Math.max(min_hp, Math.ceil(card_level * (1.4 + Random.float(-0.5, 0.5)))));
             }
         } else if (card.type == CardType_Treasure || card.type == CardType_Weapon) {
             function spawn_item(bad_x = -1, bad_y = -1) {            
@@ -582,7 +580,7 @@ class Game {
                         case WeaponType_Spear: item.value = Math.ceil((1 * card_level) * (1 + Random.float(-0.2, 0.2)));
                         case WeaponType_Bow: item.value = Math.ceil((1.5 * card_level) * (1 + Random.float(-0.2, 0.2)));
                         case WeaponType_Laser: {
-                            item.value = Math.ceil((5 * card_level) * (1 + Random.float(-0.2, 0.2)));
+                            item.value = Math.ceil((3 * card_level) * (1 + Random.float(-0.2, 0.2)));
                             item.value_max = item.value;
                         }
                         default: item.value = 0;
@@ -690,7 +688,23 @@ class Game {
         switch (type) {
             case ArcanaType_None:
 
-            // case ArcanaType_Fool:
+            case ArcanaType_Fool: {
+                make_message("All cards were uncovered");
+                for (x in 0...cardmap_width) {
+                    for (y in 0...cardmap_height) {
+                        var card = cards[x][y];
+                        if (card.covered) {
+                            card.covered = false;
+                            for (dude in Entity.get(Dude)) {
+                                var dude_card = card_at_position(dude.x, dude.y);
+                                if (dude_card.x == card.x && dude_card.y == card.y) {
+                                    dude.active = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             case ArcanaType_Strength: {
                 make_message("Next 5 cards are weapon cards");
@@ -1461,6 +1475,7 @@ class Game {
         }
 
         // Item interactions
+        // add +e action here
         if (state == GameState_PlayerTurn) {
             // Drag start
             if (Mouse.left_click()) {
@@ -1511,7 +1526,7 @@ class Game {
                 var y = Std.int(Mouse.y / tilesize);
 
                 if (Mouse.x < inventory_x - 1) {
-                    // Map items, insert into free inventory slot or swap with item of same type
+                    // Map items, insert into free inventory slot or swap with item of same type or consume if holding E
                     var clicked_item: Item = null;
 
                     for (item in Entity.get(Item)) {
@@ -1593,20 +1608,29 @@ class Game {
                             clicked_item.on_ground = false;
                             inventory[equipped_armor_inventory_slot] = clicked_item;
                         } else {
-                            var open_slot_found = false;
-
-                            for (i in 0...inventory_slots) {
-                                if (inventory[i] == null) {
-                                    equip(clicked_item);
-                                    clicked_item.on_ground = false;
-                                    inventory[i] = clicked_item;
-                                    open_slot_found = true;
-                                    break;
+                            if (Input.pressed(Key.E) && clicked_item.type == ItemType_Consumable && clicked_item.consumable_type == ConsumableType_Potion) {
+                                player.hp += clicked_item.value;
+                                if (player.hp > player.hp_max) {
+                                    player.hp = player.hp_max;
                                 }
-                            }
+                                clicked_item.delete();
+                                state = GameState_PlayerVisual; // using a potion takes a turn
+                            } else {
+                                var open_slot_found = false;
 
-                            if (!open_slot_found) {
-                                make_message("Inventory is full");
+                                for (i in 0...inventory_slots) {
+                                    if (inventory[i] == null) {
+                                        equip(clicked_item);
+                                        clicked_item.on_ground = false;
+                                        inventory[i] = clicked_item;
+                                        open_slot_found = true;
+                                        break;
+                                    }
+                                }
+
+                                if (!open_slot_found) {
+                                    make_message("Inventory is full");
+                                }
                             }
                         }
                     }
@@ -1667,7 +1691,7 @@ class Game {
             var put_in_inventory = false;
             var put_in_trash = false;
             var slot_index = -1;
-            var consumable_used = false;
+            var bomb_used = false;
 
             if (Math.point_box_intersect(Mouse.x, Mouse.y, trash_x, trash_y, inventory_slot_size, inventory_slot_size)) {
                 // Trash item
@@ -1766,7 +1790,7 @@ class Game {
                     && Math.abs(drop_y - player.y) < 2;
 
                     if (walls[drop_x][drop_y] || dropped_on_dude) {
-                        consumable_used = true;
+                        bomb_used = true;
                     }
                 } else {
                     can_drop = !out_of_bounds(drop_x, drop_y) 
@@ -1780,16 +1804,6 @@ class Game {
                     make_message("You can't drop the item there!");
                 }
 
-                function try_consume(item) {
-                    if (drop_x == player.x && drop_y == player.y) {
-                        player.hp += dragged_item.value;
-                        if (player.hp > player.hp_max) {
-                            player.hp = player.hp_max;
-                        }
-                        item.delete();
-                        consumable_used = true;
-                    }
-                }
                 function blow_up(item) {
                     walls[item.x][item.y] = false;
                     for (dude in Entity.get(Dude)) {
@@ -1809,10 +1823,7 @@ class Game {
                     if (can_drop) {
                         dragged_item.x = drop_x;
                         dragged_item.y = drop_y;
-                        trace(dragged_item.consumable_type);
-                        if (dragged_item.consumable_type == ConsumableType_Potion) {
-                            try_consume(dragged_item);
-                        } else if (dragged_item.type == ItemType_Bomb) {
+                        if (dragged_item.type == ItemType_Bomb) {
                             blow_up(dragged_item);
                         }
                     }
@@ -1823,9 +1834,7 @@ class Game {
                         dragged_item.y = drop_y;
                         dragged_item.on_ground = true;
 
-                        if (dragged_item.consumable_type == ConsumableType_Potion) {
-                            try_consume(dragged_item);
-                        } else if (dragged_item.type == ItemType_Bomb) {
+                        if (dragged_item.type == ItemType_Bomb) {
                             blow_up(dragged_item);
                         }
                     } else {
@@ -1836,7 +1845,7 @@ class Game {
 
 
             dragged_item = null;
-            if (consumable_used) {
+            if (bomb_used) {
                 state = GameState_PlayerVisual;
             } else {
                 state = GameState_PlayerTurn;
@@ -2011,6 +2020,9 @@ class Game {
                     attack_damage = inventory[i].value;
                     break;
                 }
+            }
+            if (GOD_MODE) {
+                attack_damage = 100000;
             }
 
             var hit_cells = new Array<IntVector2>();
@@ -2601,5 +2613,6 @@ class Game {
         GUI.x = 1000;
         GUI.y = 600;
         GUI.auto_text_button("magic", function() { do_arcana_magic(ArcanaType_None); });
+        GUI.auto_text_button("godmode", function() { GOD_MODE = true; });
     }
 }
