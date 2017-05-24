@@ -13,6 +13,7 @@ enum ItemType {
 	ItemType_Consumable;
 	ItemType_Arrows;
 	ItemType_Bomb;
+	ItemType_Money;
 }
 
 enum ConsumableType {

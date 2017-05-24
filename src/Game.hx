@@ -14,6 +14,7 @@ enum GameState {
     GameState_EnemyTurnResult;
     GameState_ItemDrag;
     GameState_CardFlip;
+    GameState_Shop;
 }
 
 enum CardType {
@@ -22,6 +23,7 @@ enum CardType {
     CardType_Treasure;
     CardType_Weapon;
     CardType_Arcana;
+    CardType_Shop;
 }
 
 enum ArcanaType {
@@ -96,7 +98,7 @@ class Game {
     static inline var DRAW_CARD_LEVEL = true;
     static inline var ARROW_HACK = false;
     static inline var DRAW_LOS_DEBUG = false;
-    var GOD_MODE = false;
+    var GOD_MODE = true;
 
     static var default_card_type = null;
     static var default_arcana_type = null;
@@ -153,6 +155,7 @@ class Game {
     var card_type_history = new Array<CardType>();
     static inline var too_old_age = 30;
     var pending_treasure_cards = 0;
+    static inline var max_money_amount = 10;
 
     var player:Player;
     var inventory = new Vector<Item>(inventory_slots);
@@ -163,6 +166,7 @@ class Game {
     var arcana_timer = 0;
 
     function new() {
+
         Walls.generate();
 
         // Canvas for card flip animation
@@ -293,12 +297,14 @@ class Game {
     CardType_Weapon,
     CardType_Treasure,
     CardType_Dude,
+    CardType_Shop,
     ];
     var card_type_chances: Array<Chance> = [
-    {val: 8, min: 0, max: 1}, // Arcana
-    {val: 2, min: 0, max: 2}, // Weapon
-    {val: 3, min: 0, max: 2}, // Treasure
-    {val: 90, min: 2, max: 8},// Dude
+    {val: 8, min: 0, max: 1},
+    {val: 2, min: 0, max: 2},
+    {val: 3, min: 0, max: 2},
+    {val: 90, min: 2, max: 8},
+    {val: 200, min: 0, max: 1},
     ];
 
     function generate_card_type():Dynamic {
@@ -375,12 +381,14 @@ class Game {
     ItemType_Bomb,
     ItemType_Arrows,
     ItemType_Armor,
+    ItemType_Money,
     ];
     var treasure_chances: Array<Chance> = [
     {val: 4, min: 0, max: 5},
     {val: 4, min: 0, max: 5},
     {val: 2, min: 0, max: 5},
     {val: 4, min: 0, max: 5},
+    {val: 2, min: 0, max: 5},
     ];
 
     var weapon_order = [
@@ -598,6 +606,10 @@ class Game {
                 } else if (item.type == ItemType_Bomb) {
                     item.tile = Tiles.Bomb;
                     item.name = "Bomb";
+                } else if (item.type == ItemType_Money) {
+                    item.tile = Tiles.Money;
+                    item.name = "Money";
+                    item.amount = Random.int(2, 4);
                 }
                 walls[item.x][item.y] = false;
                 
@@ -625,6 +637,24 @@ class Game {
 
             // remove wall at activation cell
             walls[card.x * card_width + 1][card.y * card_height + 2] = false;
+        } else if (card.type == CardType_Shop) {
+            for (i in 0...card_width) {
+                for (j in 0...card_height) {
+                    walls[card.x * card_width + i][card.y * card_height + j] = false;
+                }
+            }
+            var walls_preset = [
+            [0, 0, 0],
+            [1, 0, 1],
+            [0, 0, 0],
+            [1, 0, 1],
+            [0, 0, 0],
+            ];
+            for (i in 0...card_width) {
+                for (j in 0...card_height) {
+                    walls[card.x * card_width + i][card.y * card_height + j] = (walls_preset[j][i] == 1);
+                }
+            }
         }
     }
 
@@ -1012,6 +1042,8 @@ class Game {
                 Text.display(x + tilesize / 10, y + tilesize / 2, '${item.amount}');
             } else if (item.type == ItemType_Armor && item.value <= 0) {
                 Gfx.fill_box(x, y, tilesize, tilesize, Col.RED, 0.5);
+            } else if (item.type == ItemType_Money) {
+                Text.display(x + tilesize - tilesize / 10, y + tilesize / 2, '${item.amount}');
             }
         }
 
@@ -1103,6 +1135,7 @@ class Game {
                     case CardType_Treasure: card_color = Col.YELLOW;
                     case CardType_Weapon: card_color = Col.GREEN;
                     case CardType_Arcana: card_color = Col.DARKGREEN;
+                    case CardType_Shop: card_color = Col.BROWN;
                     case CardType_None: card_color = Col.BLACK;
                 }
 
@@ -1135,6 +1168,10 @@ class Game {
                             Gfx.fill_box(x * card_width * tilesize, y * card_height * tilesize,
                                 card_width * tilesize, card_height * tilesize, card_color, 0.15);
                         }
+                    } else if (card.type == CardType_Shop) {
+                        Text.display(x * card_width * tilesize, (y + 1) * card_height * tilesize - tilesize, "Shop", Col.WHITE);
+                        Gfx.fill_circle((x * card_width + 1.5) * tilesize, (y * card_height + 2.5) * tilesize, 
+                            tilesize * 0.75, Col.BROWN, 0.5);
                     }
                 }
 
@@ -1505,6 +1542,10 @@ class Game {
                     clicked_item = null;
                 }
 
+                function pick_up_money(item) {
+
+                }
+
                 if (clicked_item != null) {
                     if (Mouse.left_click()) {
                         // Drag start
@@ -1592,20 +1633,40 @@ class Game {
                             clicked_item.on_ground = false;
                             inventory[equipped_armor_inventory_slot] = clicked_item;
                         } else {
-                            var open_slot_found = false;
 
-                            for (i in 0...inventory_slots) {
-                                if (inventory[i] == null) {
-                                    equip(clicked_item);
-                                    clicked_item.on_ground = false;
-                                    inventory[i] = clicked_item;
-                                    open_slot_found = true;
-                                    break;
+                            if (clicked_item.type == ItemType_Money) {
+                                // Stack picked up money with money in inventory
+                                for (i in 0...inventory_slots) {
+                                    if (inventory[i] != null && inventory[i].type == ItemType_Money && inventory[i].amount < max_money_amount) {
+                                        var added = Std.int(Math.min(clicked_item.amount, max_money_amount - inventory[i].amount));
+                                        inventory[i].amount += added;
+                                        clicked_item.amount -= added;
+                                        if (clicked_item.amount == 0) {
+                                            break;
+                                        }
+                                    }
                                 }
                             }
 
-                            if (!open_slot_found) {
-                                make_message("Inventory is full");
+                            if (clicked_item.type == ItemType_Money && clicked_item.amount == 0) {
+                                clicked_item.on_ground = false;
+                                clicked_item.delete();
+                            } else {
+                                var open_slot_found = false;
+
+                                for (i in 0...inventory_slots) {
+                                    if (inventory[i] == null) {
+                                        equip(clicked_item);
+                                        clicked_item.on_ground = false;
+                                        inventory[i] = clicked_item;
+                                        open_slot_found = true;
+                                        break;
+                                    }
+                                }
+
+                                if (!open_slot_found) {
+                                    make_message("Inventory is full");
+                                }
                             }
                         }
                     } else if (Mouse.right_click()) {
@@ -1623,7 +1684,7 @@ class Game {
                 var clicked_item: Item = null;
                 var clicked_item_inventory_slot = 0;
 
-                // Inventory items, drop onto nearest empty cell on ground
+                // Inventory items, drop onto ground
                 for (i in 0...inventory_slots) {
                     if (inventory[i] != null
                         && Math.point_box_intersect(Mouse.x, Mouse.y, inventory_x, inventory_y + i * inventory_slot_size,
@@ -1771,23 +1832,34 @@ class Game {
                     && !walls[drop_x][drop_y]
                     && !dropped_on_dude;
                 }
+                // Can't drop item onto item
+                for (item in Entity.get(Item)) {
+                    if (item.on_ground && item.x == drop_x && item.y == drop_y) {
+                        can_drop = false;
+                    }
+                }
 
                 if (!can_drop) {
                     make_message("You can't drop the item there!");
                 }
 
-                function blow_up(item) {
+                function drop_bomb(item) {
+                    if (walls[item.x][item.y]) {
+                        explosion_happened = true;
+                    }
                     walls[item.x][item.y] = false;
                     for (dude in Entity.get(Dude)) {
                         if (dude.active && dude.x == drop_x && dude.y == drop_y) {
                             dude.blown = true;
+                            explosion_happened = true;
                             break;
                         }
                     }
-                    explosion_happened = true;
-                    explosion_x = drop_x;
-                    explosion_y = drop_y;
-                    item.delete();
+                    if (explosion_happened) {
+                        explosion_x = drop_x;
+                        explosion_y = drop_y;
+                        item.delete();
+                    }
                 }
 
                 if (dragged_item.on_ground) {
@@ -1796,7 +1868,7 @@ class Game {
                         dragged_item.x = drop_x;
                         dragged_item.y = drop_y;
                         if (dragged_item.type == ItemType_Bomb) {
-                            blow_up(dragged_item);
+                            drop_bomb(dragged_item);
                         }
                     }
                 } else {
@@ -1807,7 +1879,7 @@ class Game {
                         dragged_item.on_ground = true;
 
                         if (dragged_item.type == ItemType_Bomb) {
-                            blow_up(dragged_item);
+                            drop_bomb(dragged_item);
                         }
                     } else {
                         inventory[dragged_item_inventory_slot] = dragged_item;
@@ -2463,8 +2535,17 @@ class Game {
 
         render();
 
-        state = GameState_PlayerTurn;
 
+        var card_with_player_pos = card_at_position(player.x, player.y);
+        var card_with_player = cards[card_with_player_pos.x][card_with_player_pos.y];
+        // Activate shop card, if player stepped on one
+        if (card_with_player.type == CardType_Shop && !card_with_player.arcana_activated 
+            && (player.x - 1) % card_width == 0 && (player.y - 2) % card_height == 0) 
+        {
+            state = GameState_Shop;
+        } else {
+            state = GameState_PlayerTurn;
+        }
 
         var entity_states = new Array<String>();
         entity_states.push(serialize(player));
@@ -2495,6 +2576,86 @@ class Game {
             cards[flipped_card.x][flipped_card.y].covered = false;
             cards_covered--;
         }
+    }
+
+    function count_money() {
+        var total = 0;
+        for (i in 0...inventory_slots) {
+            if (inventory[i] != null && inventory[i].type == ItemType_Money) {
+                total += inventory[i].amount;
+            }
+        }
+        return total;
+    }
+
+    function substract_money(amount) {
+        var amount_left = amount;
+        for (i in 0...inventory_slots) {
+            if (inventory[i] != null && inventory[i].type == ItemType_Money) {
+                var money = inventory[i];
+                if (money.amount > amount_left) {
+                    money.amount -= amount_left;
+                    amount_left = 0;
+                } else {
+                    amount_left -= money.amount;
+                    money.amount = 0;
+                    money.delete();
+                    inventory[i] = null;
+                }
+
+                if (amount_left == 0) {
+                    break;
+                }
+            }
+        }
+    }
+
+    function add_money() {
+    }
+
+    function update_shop() {
+        render();
+        // Draw shop ui
+        // Repair armor
+        // Buy stuff
+        Gfx.fill_box(1 * tilesize, 1 * tilesize, (map_width - 2) * tilesize, (map_height - 2) * tilesize, Col.GRAY, 0.6);
+        Text.display(2 * tilesize, 1 * tilesize, "Shop");
+        GUI.x = 2 * tilesize;
+        GUI.y = 2 * tilesize;
+        GUI.auto_text_button("Repair all armor, cost: 3", function() {
+            if (count_money() >= 3) {
+                substract_money(3);
+            }
+            for (i in 0...inventory_slots) {
+                var item = inventory[i];
+                if (item != null && item.type == ItemType_Armor) {
+                    item.value = Math.min(item.value + 1, item.value_max);
+                }
+            }
+        });
+        GUI.auto_text_button("Upgrade weapon, cost: 3", function() {
+            if (count_money() >= 3) {
+                substract_money(3);
+            }
+            var found_weapon = false;
+            for (i in 0...inventory_slots) {
+                var item = inventory[i];
+                if (item != null && item.type == ItemType_Weapon) {
+                    item.value++;
+                    found_weapon = true;
+                    break;
+                }
+            } 
+
+            if (!found_weapon) {
+                fist_damage++;
+            }
+        });
+        GUI.auto_text_button("Exit", function() { state = GameState_PlayerTurn; }, 3);
+
+        // TODO: icon where you drag items onto to sell them
+
+        // Exit shop by menu action
     }
 
     function update() {
@@ -2578,6 +2739,7 @@ class Game {
             case GameState_EnemyVisual: update_enemy_visual();
             case GameState_EnemyTurnResult: update_enemy_turn_result();
             case GameState_CardFlip: update_card_flip();
+            case GameState_Shop: update_shop();
         }
 
         GUI.enum_setter(1000, 800, function(x) { player.weapon = x; }, player.weapon, WeaponType);
