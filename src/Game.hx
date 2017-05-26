@@ -154,7 +154,6 @@ class Game {
     var card_level_increment_timer = Random.int(card_level_increment_timer_min, card_level_increment_timer_max);
     var card_type_history = new Array<CardType>();
     static inline var too_old_age = 30;
-    var pending_treasure_cards = 0;
     static inline var max_money_amount = 10;
 
     var player:Player;
@@ -303,9 +302,17 @@ class Game {
     {val: 8, min: 0, max: 1},
     {val: 2, min: 0, max: 2},
     {val: 3, min: 0, max: 2},
-    {val: 90, min: 2, max: 8},
-    {val: 200, min: 0, max: 1},
+    {val: 10, min: 2, max: 8},
+    {val: 0, min: 0, max: 1},
     ];
+
+    // var card_type_chances: Array<Chance> = [
+    // {val: 1, min: 0, max: 1},
+    // {val: 1, min: 0, max: 2},
+    // {val: 2, min: 0, max: 2},
+    // {val: 15, min: 2, max: 8},
+    // {val: 1, min: 0, max: 1},
+    // ];
 
     function generate_card_type():Dynamic {
         var type = CardType_None;
@@ -326,18 +333,6 @@ class Game {
             arcana_timer--;
             if (arcana_timer <= 0) {
                 active_arcana = null;
-            }
-        } else if (pending_treasure_cards > 0) {
-            pending_treasure_cards--;
-
-            if (Random.chance(70)) {
-                if (Random.chance(20)) {
-                    type = CardType_Weapon;
-                } else {
-                    type = CardType_Treasure;
-                }
-            } else {
-                type = get_chance(CardType, card_type_order, card_type_chances);
             }
         } else {
             type = get_chance(CardType, card_type_order, card_type_chances);
@@ -501,6 +496,93 @@ class Game {
             loop_number++;
         }
 
+        function spawn_item(): Item {            
+            var free_map = get_free_map(false);
+            var free_cell = random_cell_in_card(card.x, card.y, function(x, y) { return free_map[x][y]; });
+            if (free_cell.x == -1 || free_cell.y == -1) {
+                trace("spawn_item() failed");
+                return null;
+            }
+            var item = new Item();
+            item.x = free_cell.x;
+            item.y = free_cell.y;
+            if (card.type == CardType_Weapon) {
+                item.type = ItemType_Weapon;
+            } else {
+                item.type = get_chance(ItemType, treasure_order, treasure_chances);
+            }
+
+            if (default_item_type != null) {
+                item.type = default_item_type;
+            }
+
+            item.info += '\nI am ${item.type}!';
+
+            if (item.type == ItemType_Consumable) {
+                item.consumable_type = random_enum(ConsumableType, 1);
+                if (default_consumable_type != null) {
+                    item.consumable_type = default_consumable_type;
+                }
+                item.value = 2 * card_level;
+                item.tile = Tiles.Potion;
+                item.name = "Potion";
+            } else if (item.type == ItemType_Armor) {
+                item.armor_type = get_chance(ArmorType, armor_order, armor_chances);
+                if (default_armor_type != null) {
+                    item.consumable_type = default_armor_type;
+                }
+                item.value = Std.int(Random.float(0.8, 1.2) * card_level);
+                if (item.value == 0) {
+                    item.value = 1;
+                }
+                item.value_max = item.value;
+                item.name = "Armor";
+                switch (item.armor_type) {
+                    case ArmorType_Chest: item.tile = Tiles.Chest;
+                    case ArmorType_Head: item.tile = Tiles.Head;
+                    case ArmorType_Legs: item.tile = Tiles.Legs;
+                    default: item.tile = Tiles.Wilhelm;
+                }
+            } else if (item.type == ItemType_Weapon) {
+                item.weapon_type = get_chance(WeaponType, weapon_order, weapon_chances);
+                if (default_weapon_type != null) {
+                    item.weapon_type = default_weapon_type;
+                }
+
+                item.name = "Weapon";
+                switch (item.weapon_type) {
+                    case WeaponType_Sword: item.value = Math.ceil((2 * card_level) * (1 + Random.float(-0.2, 0.2)));
+                    case WeaponType_Spear: item.value = Math.ceil((1 * card_level) * (1 + Random.float(-0.2, 0.2)));
+                    case WeaponType_Bow: item.value = Math.ceil((1.5 * card_level) * (1 + Random.float(-0.2, 0.2)));
+                    case WeaponType_Laser: {
+                        item.value = Math.ceil((3 * card_level) * (1 + Random.float(-0.2, 0.2)));
+                        item.value_max = item.value;
+                    }
+                    default: item.value = 0;
+                }
+                switch (item.weapon_type) {
+                    case WeaponType_Sword: item.tile = Tiles.Sword;
+                    case WeaponType_Spear: item.tile = Tiles.Spear;
+                    case WeaponType_Bow: item.tile = Tiles.Bow;
+                    default: item.tile = Tiles.Wilhelm;
+                }
+            } else if (item.type == ItemType_Arrows) {
+                item.amount = Random.int(7, 11);
+                item.tile = Tiles.Arrows;
+                item.name = "Arrows";
+            } else if (item.type == ItemType_Bomb) {
+                item.tile = Tiles.Bomb;
+                item.name = "Bomb";
+            } else if (item.type == ItemType_Money) {
+                item.tile = Tiles.Money;
+                item.name = "Money";
+                item.amount = Random.int(2, 4);
+            }
+            walls[item.x][item.y] = false;
+
+            return item;
+        }
+
         //TODO: make a better formula for item and dude values based on card level(currently simply linear)
         if (card.type == CardType_Dude) {
             card.completed = false;
@@ -533,94 +615,18 @@ class Game {
                 dude.hp = dude.hp_max;
                 dude.dmg = Std.int(Math.max(min_hp, Math.ceil(card_level * (1.4 + Random.float(-0.5, 0.5)))));
             }
-        } else if (card.type == CardType_Treasure || card.type == CardType_Weapon) {
-            function spawn_item(bad_x = -1, bad_y = -1) {            
-                var item = new Item();
-                var free_cell = random_cell_in_card(card.x, card.y, function(x, y) { return !walls[x][y]; });
-                item.x = free_cell.x;
-                item.y = free_cell.y;
-                if (card.type == CardType_Weapon) {
-                    item.type = ItemType_Weapon;
-                } else {
-                    item.type = get_chance(ItemType, treasure_order, treasure_chances);
-                }
 
-                if (default_item_type != null) {
-                    item.type = default_item_type;
-                }
-
-                item.info += '\nI am ${item.type}!';
-
-                if (item.type == ItemType_Consumable) {
-                    item.consumable_type = random_enum(ConsumableType, 1);
-                    if (default_consumable_type != null) {
-                        item.consumable_type = default_consumable_type;
-                    }
-                    item.value = 2 * card_level;
-                    item.tile = Tiles.Potion;
-                    item.name = "Potion";
-                } else if (item.type == ItemType_Armor) {
-                    item.armor_type = get_chance(ArmorType, armor_order, armor_chances);
-                    if (default_armor_type != null) {
-                        item.consumable_type = default_armor_type;
-                    }
-                    item.value = Std.int(Random.float(0.8, 1.2) * card_level);
-                    if (item.value == 0) {
-                        item.value = 1;
-                    }
-                    item.value_max = item.value;
-                    item.name = "Armor";
-                    switch (item.armor_type) {
-                        case ArmorType_Chest: item.tile = Tiles.Chest;
-                        case ArmorType_Head: item.tile = Tiles.Head;
-                        case ArmorType_Legs: item.tile = Tiles.Legs;
-                        default: item.tile = Tiles.Wilhelm;
-                    }
-                } else if (item.type == ItemType_Weapon) {
-                    item.weapon_type = get_chance(WeaponType, weapon_order, weapon_chances);
-                    if (default_weapon_type != null) {
-                        item.weapon_type = default_weapon_type;
-                    }
-
-                    item.name = "Weapon";
-                    switch (item.weapon_type) {
-                        case WeaponType_Sword: item.value = Math.ceil((2 * card_level) * (1 + Random.float(-0.2, 0.2)));
-                        case WeaponType_Spear: item.value = Math.ceil((1 * card_level) * (1 + Random.float(-0.2, 0.2)));
-                        case WeaponType_Bow: item.value = Math.ceil((1.5 * card_level) * (1 + Random.float(-0.2, 0.2)));
-                        case WeaponType_Laser: {
-                            item.value = Math.ceil((3 * card_level) * (1 + Random.float(-0.2, 0.2)));
-                            item.value_max = item.value;
-                        }
-                        default: item.value = 0;
-                    }
-                    switch (item.weapon_type) {
-                        case WeaponType_Sword: item.tile = Tiles.Sword;
-                        case WeaponType_Spear: item.tile = Tiles.Spear;
-                        case WeaponType_Bow: item.tile = Tiles.Bow;
-                        default: item.tile = Tiles.Wilhelm;
-                    }
-                } else if (item.type == ItemType_Arrows) {
-                    item.amount = Random.int(7, 11);
-                    item.tile = Tiles.Arrows;
-                    item.name = "Arrows";
-                } else if (item.type == ItemType_Bomb) {
-                    item.tile = Tiles.Bomb;
-                    item.name = "Bomb";
-                } else if (item.type == ItemType_Money) {
-                    item.tile = Tiles.Money;
-                    item.name = "Money";
-                    item.amount = Random.int(2, 4);
-                }
-                walls[item.x][item.y] = false;
-                
-                return item;
+            // Spawn items
+            if (Random.chance(50)) {
+                spawn_item();
             }
+        } else if (card.type == CardType_Treasure || card.type == CardType_Weapon) {
 
             var item = spawn_item();
-            if (active_arcana == ArcanaType_Temperance) {
+            if (item != null && active_arcana == ArcanaType_Temperance) {
                 // Temperance effect: spawn another item with a 50% chance
                 if (Random.chance(50)) {
-                    spawn_item(item.x, item.y);
+                    spawn_item();
                 }
 
                 arcana_timer--;
@@ -628,7 +634,6 @@ class Game {
                     active_arcana = null;
                 }
             }
-
         } else if (card.type == CardType_Arcana) {
             card.arcana = random_enum(ArcanaType, 1);
             if (default_arcana_type != null) {
@@ -1499,7 +1504,7 @@ class Game {
                 trace(2);
                 var x = Std.int(Mouse.x / tilesize);
                 var y = Std.int(Mouse.y / tilesize);
-                var move_map = get_free_map();
+                var move_map = get_free_map(false);
                 if (!out_of_bounds(x, y) && move_map[x][y]) {
                     trace(3);
                     player.x = x;
@@ -1682,7 +1687,7 @@ class Game {
                 // right click = use if consumable
 
                 var clicked_item: Item = null;
-                var clicked_item_inventory_slot = 0;
+                var clicked_slot = 0;
 
                 // Inventory items, drop onto ground
                 for (i in 0...inventory_slots) {
@@ -1691,7 +1696,7 @@ class Game {
                             inventory_slot_size, inventory_slot_size)) 
                     {
                         clicked_item = inventory[i];
-                        clicked_item_inventory_slot = i;
+                        clicked_slot = i;
                         break;
                     }
                 }
@@ -1701,13 +1706,13 @@ class Game {
                         state = GameState_ItemDrag;
                         dragged_item = clicked_item;
                         drag_dx = Mouse.x - inventory_x;
-                        drag_dy = Mouse.y - inventory_y - clicked_item_inventory_slot * inventory_slot_size;
-                        dragged_item_inventory_slot = clicked_item_inventory_slot;
-                        inventory[clicked_item_inventory_slot] = null;
+                        drag_dy = Mouse.y - inventory_y - clicked_slot * inventory_slot_size;
+                        dragged_item_inventory_slot = clicked_slot;
+                        inventory[clicked_slot] = null;
                     } else if (Mouse.right_click()) {
                         if (clicked_item.type == ItemType_Consumable && clicked_item.consumable_type == ConsumableType_Potion) {
                             consume_potion(clicked_item);
-                            inventory[clicked_item_inventory_slot] = null;
+                            inventory[clicked_slot] = null;
                             state = GameState_PlayerVisual;
                         }
                     }
@@ -2422,7 +2427,6 @@ class Game {
                         }
                     }
                     if (all_dudes_dead) {
-                        pending_treasure_cards++; // spawn treasure after completing dude card
                         card.completed = true;
                     }
                 }
@@ -2610,9 +2614,6 @@ class Game {
         }
     }
 
-    function add_money() {
-    }
-
     function update_shop() {
         render();
         // Draw shop ui
@@ -2629,7 +2630,7 @@ class Game {
             for (i in 0...inventory_slots) {
                 var item = inventory[i];
                 if (item != null && item.type == ItemType_Armor) {
-                    item.value = Math.min(item.value + 1, item.value_max);
+                    item.value = Std.int(Math.min(item.value + 1, item.value_max));
                 }
             }
         });
@@ -2653,9 +2654,71 @@ class Game {
         });
         GUI.auto_text_button("Exit", function() { state = GameState_PlayerTurn; }, 3);
 
-        // TODO: icon where you drag items onto to sell them
+        Text.display((map_width - 7) * tilesize, (map_width - 2) * tilesize, "Right click items to sell them");
 
-        // Exit shop by menu action
+        // Selling items hover info
+        if (Mouse.x >= inventory_x) {
+            var mouse_x = Std.int(Mouse.x / tilesize);
+            var mouse_y = Std.int(Mouse.y / tilesize);
+            var hover_item: Item = null;
+            var hover_slot = 0;
+            for (i in 0...inventory_slots) {
+                if (inventory[i] != null
+                    && Math.point_box_intersect(Mouse.x, Mouse.y, inventory_x, inventory_y + i * inventory_slot_size,
+                        inventory_slot_size, inventory_slot_size)) 
+                {
+                    hover_item = inventory[i];
+                    hover_slot = i;
+                    break;
+                }
+            }
+
+            if (hover_item != null) {
+                // TODO: customize sell value
+                var sell_value = 7;
+                // Draw hover info
+                Gfx.fill_box(Mouse.x, Mouse.y, tilesize * 2.5, tilesize * 0.75, Col.GRAY);
+                if (hover_item.type != ItemType_Money) {
+                    Text.display(Mouse.x, Mouse.y, 'Sells for: $sell_value');
+                }
+
+                if (Mouse.right_click()) {
+                    inventory[hover_slot] = null;
+                    hover_item.delete();
+
+                    // Add money
+                    // If there's space, we just add to inventory
+                    // NOTE: max stack of money is 10, so if item sells for more than that, there is a chance that there's not enough space for the money
+                    var amount_to_add = sell_value;
+                    for (i in 0...inventory_slots) {
+                        if (inventory[i] != null && inventory[i].type == ItemType_Money) {
+                            var money = inventory[i];
+                            if (10 - money.amount > amount_to_add) {
+                                money.amount += amount_to_add;
+                                amount_to_add = 0;
+                            } else {
+                                amount_to_add -= (10 - money.amount);
+                                money.amount = 10;
+                            }
+
+                            if (amount_to_add == 0) {
+                                break;
+                            }
+                        }
+                    }
+                    // Add rest of money into sold item slot
+                    if (amount_to_add != 0) {
+                        inventory[hover_slot] = new Item();
+                        var new_money = inventory[hover_slot];
+                        new_money.type = ItemType_Money;
+                        new_money.tile = Tiles.Money;
+                        new_money.name = "Money";
+                        new_money.amount = amount_to_add;
+                        new_money.on_ground = false;
+                    }
+                }
+            }
+        }
     }
 
     function update() {
