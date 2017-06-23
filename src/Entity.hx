@@ -136,4 +136,7 @@ class Item extends Entity {
 	var value = 0; // used for armor amount, weapon damage, consumable effect interchangibly
 	var value_max = 0;
 	var amount = 1;
+
+	var hp_bonus = 0; 
+	var dmg_bonus = 0; 
 }
