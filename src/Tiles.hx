@@ -6,7 +6,7 @@ class Tiles {
         return y * tileset_width + x;
     }
 
-    static inline var Wilhelm = tilenum(0, 1); // bugged tile
+    static inline var None = tilenum(0, 1); // bugged tile
 
     static inline var Player = tilenum(0, 0);
     static inline var Wall = tilenum(1, 0);
@@ -28,4 +28,7 @@ class Tiles {
     static inline var Bomb = tilenum(3, 1);
     static inline var Heart = tilenum(2, 1);
     static inline var Money = tilenum(0, 2);
+    static inline var Shooter = tilenum(1, 2);
+    static inline var Stander = tilenum(2, 2);
+    static inline var Ghost = tilenum(3, 2);
 }

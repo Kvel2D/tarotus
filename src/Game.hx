@@ -307,8 +307,8 @@ class Game {
     var card_type_chances: Array<Chance> = [
     {val: 8, min: 0, max: 1},
     {val: 2, min: 0, max: 2},
-    {val: 100, min: 0, max: 2},
-    {val: 10, min: 2, max: 8},
+    {val: 10, min: 0, max: 2},
+    {val: 100, min: 2, max: 8},
     {val: 30, min: 0, max: 1},
     ];
 
@@ -561,7 +561,7 @@ class Game {
                     case ArmorType_Chest: item.tile = Tiles.Chest;
                     case ArmorType_Head: item.tile = Tiles.Head;
                     case ArmorType_Legs: item.tile = Tiles.Legs;
-                    default: item.tile = Tiles.Wilhelm;
+                    default: item.tile = Tiles.None;
                 }
 
                 // TODO: figure out how often items should have bonuses and the scale as well
@@ -593,7 +593,7 @@ class Game {
                     case WeaponType_Sword: item.tile = Tiles.Sword;
                     case WeaponType_Spear: item.tile = Tiles.Spear;
                     case WeaponType_Bow: item.tile = Tiles.Bow;
-                    default: item.tile = Tiles.Wilhelm;
+                    default: item.tile = Tiles.None;
                 }
             } else if (item.type == ItemType_Arrows) {
                 item.amount = Random.int(7, 11);
@@ -656,6 +656,7 @@ class Game {
                 dude.hp_max = Std.int(Math.max(min_hp, Math.ceil(card_level * (2.4 + Random.float(-0.5, 0.5)) / number_of_dudes)));
                 dude.hp = dude.hp_max;
                 dude.dmg = Std.int(Math.max(min_hp, Math.ceil(card_level * (1.4 + Random.float(-0.5, 0.5)))));
+                dude.type = random_enum(DudeType, 1);
             }
 
             // Spawn items
@@ -1146,7 +1147,7 @@ class Game {
         }
         Gfx.draw_tile(trash_x, trash_y, Tiles.Trash);
 
-        if (player.angle != 0 && !player.hit) {
+        if (player.angle != 0 && player.incoming_damage == 0) {
             if (Math.abs(player.angle) < 0.1) {
                 player.angle = 0;
             } else {
@@ -1165,8 +1166,16 @@ class Game {
                     dude.angle = Math.lerp(dude.angle, 0, 0.4);
                 }
             }
-            Gfx.rotation(dude.angle); 
-            Gfx.draw_tile(dude.real_x, dude.real_y, Tiles.Dude);
+            Gfx.rotation(dude.angle);
+            var dude_tile = Tiles.None; 
+            switch (dude.type) {
+                case DudeType_Follower: dude_tile = Tiles.Dude;
+                case DudeType_Shooter: dude_tile = Tiles.Shooter;
+                case DudeType_Stander: dude_tile = Tiles.Stander;
+                case DudeType_Ghost: dude_tile = Tiles.Ghost;
+                default: trace("Unmatched dude type in render()!");
+            }
+            Gfx.draw_tile(dude.real_x, dude.real_y, dude_tile);
             Gfx.rotation(0); 
             if (!dude.dead) {
                 Text.display(dude.real_x, dude.real_y, '${dude.hp}/${dude.hp_max}', Col.WHITE);
@@ -1973,98 +1982,97 @@ class Game {
         render();
     }
 
+    function poke_visual_pos(x, y, dx, dy, dst: Float, timer, timer_max): Vector2 {
+        // Starts at (x, y), goes dst away from it, comes back
+        var progress = 0.5 - Math.abs(timer / timer_max - 0.5);
+        return {x: (x + 0.5) * tilesize + dx * progress * dst + dx * tilesize / 2, y: (y + 0.5) * tilesize + dy * progress * dst + dy * tilesize / 2};
+    }
+
+    function straight_visual_pos(x, y, dx, dy, dst, timer, timer_max): Vector2 {
+        // Goes in a straight line from (x, y) 
+        var progress = timer / timer_max;
+        return {x: (x + 0.5) * tilesize + dx * progress * dst, y: (y + 0.5) * tilesize + dy * progress * dst};
+    }
+
+
     function update_player_visual() {
+        var stop_visual = false;
+
+        var move_progress = state_timer / move_visual_timer_max;
         if (player.moved) {
-            player.real_x = Std.int(player.x * tilesize + player.dx * tilesize * (state_timer / move_visual_timer_max));
-            player.real_y = Std.int(player.y * tilesize + player.dy * tilesize * (state_timer / move_visual_timer_max));
+            player.real_x = Std.int(player.x * tilesize + player.dx * move_progress * tilesize);
+            player.real_y = Std.int(player.y * tilesize + player.dy * move_progress * tilesize);
         }
 
         render();
 
-        // Draw weapon
-        var angle = 0.0;
-        if (player.dx == 1 && player.dy == 0) {
-            angle = 0;
-        } else if (player.dx == 0 && player.dy == 1) {
-            angle = 90;
-        } else if (player.dx == -1 && player.dy == 0) {
-            angle = 180;
-        } else if (player.dx == 0 && player.dy == -1) {
-            angle = 270;
-        }
+        // Draw weapon visual
         if (player.attacked) {
-            var attack_dst = 0;
-            var timer_max = 0;
-
-            switch (player.weapon) {
-                case WeaponType_None: {
-                    timer_max = weapon_visual_timer_max;
-                    attack_dst = tilesize;
-                }
-                case WeaponType_Sword: {
-                    timer_max = weapon_visual_timer_max;
-                    attack_dst = tilesize;
-                }
-                case WeaponType_Spear: {
-                    timer_max = weapon_visual_timer_max;
-                    attack_dst = Std.int(2.5 * tilesize);
-                }
-                case WeaponType_Bow: {
-                    timer_max = bow_visual_timer_max;
-                    attack_dst = Std.int(Math.max(map_width, map_height)) * tilesize;
-                }
-                case WeaponType_Laser: {
-                    timer_max = weapon_visual_timer_max;
-                    attack_dst = Std.int(Math.max(map_width, map_height)) * tilesize;
-                }
+            var angle = 0.0;
+            if (player.dx == 1 && player.dy == 0) {
+                angle = 0;
+            } else if (player.dx == 0 && player.dy == 1) {
+                angle = 90;
+            } else if (player.dx == -1 && player.dy == 0) {
+                angle = 180;
+            } else if (player.dx == 0 && player.dy == -1) {
+                angle = 270;
             }
 
-            var attack_progress = 0.5 - Math.abs(state_timer / timer_max - 0.5);
-            var visual_x = (player.x + 0.5) * tilesize + player.dx * attack_progress * attack_dst + player.dx * tilesize / 2;
-            var visual_y = (player.y + 0.5) * tilesize + player.dy * attack_progress * attack_dst + player.dy * tilesize / 2;
-            var visual_cell_x = Std.int(visual_x / tilesize);
-            var visual_cell_y = Std.int(visual_y / tilesize);
-            var visual_card_x = Std.int(visual_cell_x / card_width);
-            var visual_card_y = Std.int(visual_cell_y / card_height);
-
             switch (player.weapon) {
                 case WeaponType_None: {
-                    Gfx.fill_circle(visual_x, visual_y, 10, Col.RED);
+                    var visual_pos = poke_visual_pos(player.x, player.y, player.dx, player.dy,
+                        tilesize, state_timer, weapon_visual_timer_max);
+                    Gfx.fill_circle(visual_pos.x, visual_pos.y, 10, Col.RED);
                 }
                 case WeaponType_Sword: {
+                    var visual_pos = poke_visual_pos(player.x, player.y, player.dx, player.dy,
+                        tilesize, state_timer, weapon_visual_timer_max);
                     var tri = [0, tilesize / 4, 0, -tilesize / 4, tilesize / 4, 0];
                     Math.rotate_vertices(tri, 0, 0, angle);
-                    Math.translate_vertices(tri, visual_x, visual_y);
+                    Math.translate_vertices(tri, visual_pos.x, visual_pos.y);
                     Gfx.fill_tri_array(tri, Col.RED);
                 }
                 case WeaponType_Spear: {
+                    var visual_pos = poke_visual_pos(player.x, player.y, player.dx, player.dy,
+                        2.5 * tilesize, state_timer, weapon_visual_timer_max);
                     var tri = [0, tilesize / 8, 0, -tilesize / 8, tilesize / 3, 0];
                     Math.rotate_vertices(tri, 0, 0, angle);
-                    Math.translate_vertices(tri, visual_x, visual_y);
+                    Math.translate_vertices(tri, visual_pos.x, visual_pos.y);
                     Gfx.fill_tri_array(tri, Col.RED);
 
-                    // Stop at wall
+                    // Stop at wall( think about another way to stop(what if another visual is longer?))
+                    var visual_cell_x = Std.int(visual_pos.x / tilesize);
+                    var visual_cell_y = Std.int(visual_pos.y / tilesize);
+                    var visual_card_x = Std.int(visual_cell_x / card_width);
+                    var visual_card_y = Std.int(visual_cell_y / card_height);
                     if (out_of_bounds(visual_cell_x, visual_cell_y) 
                         || walls[visual_cell_x][visual_cell_y]
                         || cards[visual_card_x][visual_card_y].covered) 
                     {
-                        state_timer = 1000000;
+                        stop_visual = true;
                     }
                 }
                 case WeaponType_Bow: {
+                    var visual_pos = straight_visual_pos(player.x, player.y, player.dx, player.dy,
+                        Std.int(Math.max(map_width, map_height)) * tilesize, state_timer, bow_visual_timer_max);
                     var tri = [0, tilesize / 16, 0, -tilesize / 16, tilesize / 4, 0];
                     Math.rotate_vertices(tri, 0, 0, angle);
-                    Math.translate_vertices(tri, 
-                        (player.x + 0.5) * tilesize + player.dx * state_timer / timer_max * attack_dst,
-                        (player.y + 0.5) * tilesize + player.dy * state_timer / timer_max * attack_dst);
+                    Math.translate_vertices(tri, visual_pos.x, visual_pos.y);
                     Gfx.fill_tri_array(tri, Col.RED);
 
                     // Stop at wall
+                    // TODO: here visual_cell is from "bouncy weapon pos" but bow's visual pos is different
+                    // change it
+                    var visual_cell_x = Std.int(visual_pos.x / tilesize);
+                    var visual_cell_y = Std.int(visual_pos.y / tilesize);
+                    var visual_card_x = Std.int(visual_cell_x / card_width);
+                    var visual_card_y = Std.int(visual_cell_y / card_height);
                     if (out_of_bounds(visual_cell_x, visual_cell_y) 
                         || walls[visual_cell_x][visual_cell_y]
                         || cards[visual_card_x][visual_card_y].covered) 
                     {
-                        state_timer = 1000000;
+                        stop_visual = true;
                     }
                 }
                 case WeaponType_Laser: {
@@ -2107,7 +2115,7 @@ class Game {
                 max = weapon_visual_timer_max;
             }
         }
-        if (state_timer > max) {
+        if (state_timer > max || stop_visual) {
             state = GameState_PlayerTurnResult;
             state_timer = 0;
         }
@@ -2224,92 +2232,128 @@ class Game {
         // Enemy turn
         for (dude in Entity.get(Dude)) {
             if (dude.active && !dude.dead) {
+                switch (dude.type) {
+                    case DudeType_Follower: {
+                        if (active_arcana == ArcanaType_Lovers) {
+                            // Enemies move randomly without attacking during lovers arcana
+                            var move_map = get_free_map();
+                            function random_nearby_cell(x, y): IntVector2 {
+                                for (dx in -1...2) {
+                                    for (dy in -1...2) {
+                                        if (Math.abs(dx + dy) == 1 
+                                            && !out_of_bounds( x+ dx, y + dy) 
+                                            && move_map[x + dx][y + dy]) 
+                                        {
+                                            return {x: x + dx, y: y + dy};
+                                        }
+                                    }
+                                }
+                                return {x: -1, y: -1};
+                            }
+                            var cell = random_nearby_cell(dude.x, dude.y);
+                            if (cell.x != -1) {
+                                dude.moved = true;
+                                dude.dx = cell.x - dude.x;
+                                dude.dy = cell.y - dude.y;
+                            }
+                        } else {
+                            // Check if dude can see player
+                            if (!dude.following_player) {
+                                var can_see_player = true;
+                                dude.points = new Array<IntVector2>();
+                                // Check points on a line between dude and player
+                                var x0 = dude.x;
+                                var y0 = dude.y;
+                                var x1 = player.x;
+                                var y1 = player.y;
+                                var dx = (x1 - x0) / 50.0;
+                                var dy = (y1 - y0) / 50.0;
+                                var x = x0;
+                                var y = y0;
+                                var prev_x = x;
+                                var prev_y = y;
+                                for (t in 0...50) {
+                                    x = Std.int(x0 + dx * t);
+                                    y = Std.int(y0 + dy * t);
+                                    if (x != prev_x || y != prev_y) {
+                                        dude.points.push({x: x, y: y});
+                                        if (walls[x][y]) {
+                                            can_see_player = false;
+                                        }
+                                        prev_x = x;
+                                        prev_y = y;
+                                    }
+                                }
 
-                if (active_arcana == ArcanaType_Lovers) {
-                    // Enemies move randomly without attacking during lovers arcana
-                    var move_map = get_free_map();
-                    function random_nearby_cell(x, y): IntVector2 {
-                        for (dx in -1...2) {
-                            for (dy in -1...2) {
-                                if (Math.abs(dx + dy) == 1 
-                                    && !out_of_bounds( x+ dx, y + dy) 
-                                    && move_map[x + dx][y + dy]) 
-                                {
-                                    return {x: x + dx, y: y + dy};
+                                if (can_see_player) {
+                                    dude.following_player = true;
+                                }
+                            }
+
+                            // Dude has seen the player and is following him
+                            if (dude.following_player) {
+                                var dude_player_dx = player.x - dude.x;
+                                var dude_player_dy = player.y - dude.y;
+                                if (player.moved) {
+                                    dude_player_dx += player.dx;
+                                    dude_player_dy += player.dy;
+                                }
+                                // Attack if next to player
+                                if (Math.abs(dude_player_dx) + Math.abs(dude_player_dy) == 1) {
+                                    dude.attacked = true;
+                                    if (!player.moved) {
+                                        player.incoming_damage += dude.dmg;
+                                    }
+                                    dude.dx = Math.sign(dude_player_dx);
+                                    dude.dy = Math.sign(dude_player_dy);
+                                }
+
+                                // Otherwise chase player(to the new position)
+                                if (!dude.attacked) {
+                                    var path = a_star(dude.x, dude.y, player.x, player.y);
+                                    if (path.length > 1) {
+                                        dude.moved = true;
+                                        dude.dx = path[path.length - 2].x - dude.x;
+                                        dude.dy = path[path.length - 2].y - dude.y;
+                                    }
                                 }
                             }
                         }
-                        return {x: -1, y: -1};
                     }
-                    var cell = random_nearby_cell(dude.x, dude.y);
-                    if (cell.x != -1) {
-                        dude.moved = true;
-                        dude.dx = cell.x - dude.x;
-                        dude.dy = cell.y - dude.y;
-                    }
-                } else {
-                    // Check if dude can see player
-                    if (!dude.following_player) {
-                        var can_see_player = true;
-                        dude.points = new Array<IntVector2>();
-                        // Check points on a line between dude and player
-                        var x0 = dude.x;
-                        var y0 = dude.y;
-                        var x1 = player.x;
-                        var y1 = player.y;
-                        var dx = (x1 - x0) / 50.0;
-                        var dy = (y1 - y0) / 50.0;
-                        var x = x0;
-                        var y = y0;
-                        var prev_x = x;
-                        var prev_y = y;
-                        for (t in 0...50) {
-                            x = Std.int(x0 + dx * t);
-                            y = Std.int(y0 + dy * t);
-                            if (x != prev_x || y != prev_y) {
-                                dude.points.push({x: x, y: y});
-                                if (walls[x][y]) {
-                                    can_see_player = false;
-                                }
-                                prev_x = x;
-                                prev_y = y;
-                            }
-                        }
-
-                        if (can_see_player) {
-                            dude.following_player = true;
-                        }
-                    }
-
-
-                    // Dude has seen the player and is following him
-                    if (dude.following_player) {
+                    case DudeType_Shooter: {
                         var dude_player_dx = player.x - dude.x;
                         var dude_player_dy = player.y - dude.y;
-                        if (player.moved) {
-                            dude_player_dx += player.dx;
-                            dude_player_dy += player.dy;
-                        }
-                        // Attack if next to player
-                        if (Math.abs(dude_player_dx) + Math.abs(dude_player_dy) == 1) {
+                        if (dude_player_dx == 0 || dude_player_dy == 0) {
                             dude.attacked = true;
-                            if (!player.moved) {
-                                player.hit = true;
+                            var x: Int = Std.int(dude.x);
+                            var y: Int = Std.int(dude.y);
+                            while (true) {
+                                x += Std.int(dude_player_dx); 
+                                y += Std.int(dude_player_dy);
+                                if (out_of_bounds(x, y) || walls[x][y]) {
+                                    break;
+                                } else if (!out_of_bounds(x, y) && x == player.x && y == player.y) {
+                                    player.incoming_damage += dude.dmg;
+                                    break;
+                                }
                             }
                             dude.dx = Math.sign(dude_player_dx);
                             dude.dy = Math.sign(dude_player_dy);
                         }
-
-                        // Otherwise chase player(to the new position)
-                        if (!dude.attacked) {
-                            var path = a_star(dude.x, dude.y, player.x, player.y);
-                            if (path.length > 1) {
-                                dude.moved = true;
-                                dude.dx = path[path.length - 2].x - dude.x;
-                                dude.dy = path[path.length - 2].y - dude.y;
-                            }
+                    }
+                    case DudeType_Stander: {
+                        var dude_player_dx = player.x - dude.x;
+                        var dude_player_dy = player.y - dude.y;
+                        if (Math.abs(dude_player_dx) + Math.abs(dude_player_dy) == 1) {
+                            dude.attacked = true;
+                            player.incoming_damage += dude.dmg;
+                            dude.dx = dude_player_dx;
+                            dude.dy = dude_player_dy;
                         }
                     }
+                    case DudeType_Ghost: {
+                    }
+                    default: trace("Unhandled dude type in update_player_turn_result()!");
                 }
             }
         }
@@ -2348,44 +2392,32 @@ class Game {
     }
 
     function update_enemy_visual() {
-        var all_visuals_completed = true;
+        var all_visuals_complete = true;
 
         var visual_progress = 0.0;
         for (dude in Entity.get(Dude)) {
             if (dude.moved) {
-                if (state_timer > move_visual_timer_max) {
-                    visual_progress = 1;
-                } else {
-                    visual_progress = state_timer / move_visual_timer_max;
-                }
+                visual_progress = Math.min(1, state_timer / move_visual_timer_max);
                 dude.real_x = Std.int(dude.x * tilesize + dude.dx * tilesize * visual_progress);
                 dude.real_y = Std.int(dude.y * tilesize + dude.dy * tilesize * visual_progress);
                 
                 if (state_timer < move_visual_timer_max) {
-                    all_visuals_completed = false;
+                    all_visuals_complete = false;
                 }
             } else if (dude.hit) {
                 dude.angle = -Math.sin(state_timer / 2) * 15;
                 if (state_timer < weapon_visual_timer_max) {
-                    all_visuals_completed = false;
+                    all_visuals_complete = false;
                 }
             } else if (dude.dead) {
                 dude.angle = 20 * state_timer / move_visual_timer_max;
                 if (state_timer < move_visual_timer_max) {
-                    all_visuals_completed = false;
-                }
-            } else if (dude.attacked) {
-                var attack_progress = 1 - Math.abs(state_timer / weapon_visual_timer_max - 0.5);
-                var attack_dst = 50;
-                Gfx.fill_circle((dude.x + 0.5) * tilesize + dude.dx * attack_progress * attack_dst,
-                    (dude.y + 0.5) * tilesize + dude.dy * attack_progress * attack_dst, 10, Col.BLUE);
-                if (state_timer < weapon_visual_timer_max) {
-                    all_visuals_completed = false;
+                    all_visuals_complete = false;
                 }
             }
         }
 
-        if (player.hit) {
+        if (player.incoming_damage > 0) {
             player.angle = Math.sin(state_timer / 2) * 15;
         }
 
@@ -2393,12 +2425,48 @@ class Game {
 
         for (dude in Entity.get(Dude)) {
             if (dude.attacked) {
-                var attack_progress = 1 - Math.abs(state_timer / weapon_visual_timer_max - 0.5);
-                var attack_dst = 50;
-                Gfx.fill_circle((dude.x + 0.5) * tilesize + dude.dx * attack_progress * attack_dst,
-                    (dude.y + 0.5) * tilesize + dude.dy * attack_progress * attack_dst, 10, Col.BLUE);
-                if (state_timer < weapon_visual_timer_max) {
-                    all_visuals_completed = false;
+                // Draw attack visual
+                switch (dude.type) {
+                    case DudeType_Follower: {
+                        if (state_timer < weapon_visual_timer_max) {
+                            var visual_pos = poke_visual_pos(dude.x, dude.y, dude.dx, dude.dy,
+                                50, state_timer, weapon_visual_timer_max);
+                            Gfx.fill_circle(visual_pos.x, visual_pos.y, 10, Col.BLUE);
+                            all_visuals_complete = false;
+                        }
+                    }
+                    case DudeType_Stander: {
+                        if (state_timer < weapon_visual_timer_max) {
+                            var visual_pos = poke_visual_pos(dude.x, dude.y, dude.dx, dude.dy,
+                                50, state_timer, weapon_visual_timer_max);
+                            Gfx.fill_circle(visual_pos.x, visual_pos.y, 10, Col.BLUE);
+                            all_visuals_complete = false;
+                        }
+                    }
+                    case DudeType_Shooter: {
+                        var visual_pos = poke_visual_pos(dude.x, dude.y, dude.dx, dude.dy,
+                            Std.int(Math.max(map_width, map_height)) * tilesize, state_timer, 
+                            bow_visual_timer_max);
+                        Gfx.fill_circle(visual_pos.x, visual_pos.y, 10, Col.BLUE);
+
+                        // Stop at wall
+                        var stop_visual = false;
+                        var visual_cell_x = Std.int(visual_pos.x / tilesize);
+                        var visual_cell_y = Std.int(visual_pos.y / tilesize);
+                        var visual_card_x = Std.int(visual_cell_x / card_width);
+                        var visual_card_y = Std.int(visual_cell_y / card_height);
+                        if (out_of_bounds(visual_cell_x, visual_cell_y) 
+                            || walls[visual_cell_x][visual_cell_y]
+                            || cards[visual_card_x][visual_card_y].covered) 
+                        {
+                            stop_visual = true;
+                        }
+
+                        if (!stop_visual && state_timer < bow_visual_timer_max) {
+                            all_visuals_complete = false;
+                        }
+                    }
+                    default:
                 }
             }
         }
@@ -2406,17 +2474,16 @@ class Game {
         if (explosion_happened) {
             Gfx.fill_circle((explosion_x + 0.5) * tilesize, (explosion_y + 0.5) * tilesize, 30 * state_timer / move_visual_timer_max, Col.YELLOW);
             if (state_timer < move_visual_timer_max) {
-                all_visuals_completed = false;
+                all_visuals_complete = false;
             }
         }
 
 
         state_timer++;
-        if (all_visuals_completed) {
+        if (all_visuals_complete) {
             state = GameState_EnemyTurnResult;
             state_timer = 0;
 
-            player.hit = false;
             for (dude in Entity.get(Dude)) {
                 dude.hit = false;
             }
@@ -2433,48 +2500,6 @@ class Game {
                     dude.y += dude.dy;
                     dude.real_x = dude.x * tilesize;
                     dude.real_y = dude.y * tilesize;
-                } else if (dude.attacked) {
-                    var damage = 1;
-
-                    if (player.x == dude.x + dude.dx && player.y == dude.y + dude.dy) {
-                        if (player.armor != 0) {
-                            // Apply damage to armor that has the biggest value left
-                            // Until no damage left or no armor left
-                            var armor_queue = new Array<Item>();
-                            for (i in 0...inventory_slots) {
-                                if (inventory[i] != null && inventory[i].type == ItemType_Armor) {
-                                    armor_queue.push(inventory[i]);
-                                }
-                            }
-                            armor_queue.sort(function(x, y) 
-                            { 
-                                return x.value - y.value;
-                            });
-
-                            var hit_armor: Item = null;
-                            while (damage > 0 && armor_queue.length != 0) {
-                                hit_armor = armor_queue[armor_queue.length - 1];
-
-                                if (damage >= hit_armor.value) {
-                                    damage -= hit_armor.value;
-                                    player.armor -= hit_armor.value;
-                                    hit_armor.value = 0;
-                                    armor_queue.pop();
-                                } else {
-                                    hit_armor.value -= damage;
-                                    player.armor -= damage;
-                                    damage = 0;
-                                }
-                            }
-                        }
-
-
-
-                        // If armor didnt absorb all the damage apply some to health
-                        if (damage > 0) {
-                            player.hp -= damage;
-                        }
-                    }
                 } else if (dude.dead) {
                     dead_dudes.push(dude);
                 }
@@ -2509,6 +2534,47 @@ class Game {
             }
         }
 
+        // Apply damage to player
+        if (player.armor != 0) {
+            // Apply damage to armor that has the biggest value left
+            // Until no damage left or no armor left
+            var armor_queue = new Array<Item>();
+            for (i in 0...inventory_slots) {
+                if (inventory[i] != null && inventory[i].type == ItemType_Armor) {
+                    armor_queue.push(inventory[i]);
+                }
+            }
+            armor_queue.sort(function(x, y) 
+            { 
+                return x.value - y.value;
+            });
+
+            var hit_armor: Item = null;
+            while (player.incoming_damage > 0 && armor_queue.length != 0) {
+                hit_armor = armor_queue[armor_queue.length - 1];
+
+                if (player.incoming_damage >= hit_armor.value) {
+                    player.incoming_damage -= hit_armor.value;
+                    player.armor -= hit_armor.value;
+                    hit_armor.value = 0;
+                    armor_queue.pop();
+                } else {
+                    hit_armor.value -= player.incoming_damage;
+                    player.armor -= player.incoming_damage;
+                    player.incoming_damage = 0;
+                }
+            }
+        }
+
+        // If armor didnt absorb all the damage apply some to health
+        if (player.incoming_damage > 0) {
+            player.hp -= player.incoming_damage;
+            player.incoming_damage = 0;
+        }
+
+        // TODO: Do stuff with player death here
+
+        // Increment card age
         for (x in 0...cardmap_width) {
             for (y in 0...cardmap_height) {
                 if (!cards[x][y].covered) {

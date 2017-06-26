@@ -1,4 +1,7 @@
-different enemy type
+test shooter stander(position when attacked might be off)
+
+different dude type
+dude that is a ghost and slowly moves towards you, hitting you
 
 more items
 implement and test all arcanas
@@ -22,6 +25,12 @@ multiple enemy types
 ---------------------------------------------------------------------------------------------------
 IDEAS
 ---------------------------------------------------------------------------------------------------
+
+different dude type
+dude that shoots you if you're perpendicular to it
+dude that doesn't move and attacks when you come near
+dude that is a ghost and slowly moves towards you, hitting you
+
 cursed items, for example: a high armor value gear that decreases hp or dmg
 
 shop

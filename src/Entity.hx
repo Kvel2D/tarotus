@@ -36,6 +36,14 @@ enum WeaponType {
 	WeaponType_Laser;
 }
 
+enum DudeType {
+	DudeType_None;
+	DudeType_Follower;
+	DudeType_Shooter;
+	DudeType_Stander;
+	DudeType_Ghost;
+}
+
 @:publicFields
 class Entity {
 	static var all = new Array<Dynamic>();
@@ -83,7 +91,6 @@ class Player extends Entity {
 	var real_x = 0;
 	var real_y = 0;
 	var attacked = false;
-	var hit = false;
 	var angle = 0.0;
 	var moved = false;
 	var dx = 0;
@@ -92,6 +99,7 @@ class Player extends Entity {
 	var hp = 10;
 	var hp_max = 10;
 	var armor = 0;
+	var incoming_damage = 0;
 
 	var weapon = WeaponType_None;
 }
@@ -119,6 +127,8 @@ class Dude extends Entity {
 	var info = "";
 	var points = new Array<IntVector2>(); // for debug
 	var angle = 0.0;
+
+	var type = DudeType_None;
 }
 
 class Item extends Entity {
