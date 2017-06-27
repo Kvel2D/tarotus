@@ -2229,7 +2229,7 @@ class Game {
         player.dx = 0;
         player.dy = 0;
 
-        // Enemy turn
+        // Enemies do stuff after player
         for (dude in Entity.get(Dude)) {
             if (dude.active && !dude.dead) {
                 switch (dude.type) {
@@ -2294,10 +2294,6 @@ class Game {
                             if (dude.following_player) {
                                 var dude_player_dx = player.x - dude.x;
                                 var dude_player_dy = player.y - dude.y;
-                                if (player.moved) {
-                                    dude_player_dx += player.dx;
-                                    dude_player_dy += player.dy;
-                                }
                                 // Attack if next to player
                                 if (Math.abs(dude_player_dx) + Math.abs(dude_player_dy) == 1) {
                                     dude.attacked = true;
@@ -2324,7 +2320,6 @@ class Game {
                         var dude_player_dx = player.x - dude.x;
                         var dude_player_dy = player.y - dude.y;
                         if (dude_player_dx == 0 || dude_player_dy == 0) {
-                            dude.attacked = true;
                             var x: Int = Std.int(dude.x);
                             var y: Int = Std.int(dude.y);
                             while (true) {
@@ -2333,12 +2328,13 @@ class Game {
                                 if (out_of_bounds(x, y) || walls[x][y]) {
                                     break;
                                 } else if (!out_of_bounds(x, y) && x == player.x && y == player.y) {
+                                    dude.attacked = true;
                                     player.incoming_damage += dude.dmg;
+                                    dude.dx = Math.sign(dude_player_dx);
+                                    dude.dy = Math.sign(dude_player_dy);
                                     break;
                                 }
                             }
-                            dude.dx = Math.sign(dude_player_dx);
-                            dude.dy = Math.sign(dude_player_dy);
                         }
                     }
                     case DudeType_Stander: {
@@ -2352,6 +2348,34 @@ class Game {
                         }
                     }
                     case DudeType_Ghost: {
+                        var dude_player_dx = player.x - dude.x;
+                        var dude_player_dy = player.y - dude.y;
+                        // Attack if next to player
+                        if (Math.abs(dude_player_dx) + Math.abs(dude_player_dy) == 1) {
+                            dude.attacked = true;
+                            if (!player.moved) {
+                                player.incoming_damage += dude.dmg;
+                            }
+                            dude.dx = Math.sign(dude_player_dx);
+                            dude.dy = Math.sign(dude_player_dy);
+                        }
+
+                        // Otherwise chase player(to the new position)
+                        if (!dude.attacked) {
+                            if (Random.chance(65)) {
+                                dude.moved = true;
+                                dude.dx = Math.sign(dude_player_dx);
+                                dude.dy = Math.sign(dude_player_dy);
+                                // Stop ghost from moving onto player
+                                if (Math.abs(dude_player_dx) == 1 && Math.abs(dude_player_dy) == 1) {
+                                    if (Random.chance(50)) {
+                                        dude.dx = 0;
+                                    } else {
+                                        dude.dy = 0;
+                                    }
+                                }
+                            }
+                        }
                     }
                     default: trace("Unhandled dude type in update_player_turn_result()!");
                 }
@@ -2457,12 +2481,21 @@ class Game {
                         var visual_card_y = Std.int(visual_cell_y / card_height);
                         if (out_of_bounds(visual_cell_x, visual_cell_y) 
                             || walls[visual_cell_x][visual_cell_y]
-                            || cards[visual_card_x][visual_card_y].covered) 
+                            || cards[visual_card_x][visual_card_y].covered
+                            || (player.x == visual_cell_x && player.y == visual_cell_y)) 
                         {
                             stop_visual = true;
                         }
 
                         if (!stop_visual && state_timer < bow_visual_timer_max) {
+                            all_visuals_complete = false;
+                        }
+                    }
+                    case DudeType_Ghost: {
+                        if (state_timer < weapon_visual_timer_max) {
+                            var visual_pos = poke_visual_pos(dude.x, dude.y, dude.dx, dude.dy,
+                                50, state_timer, weapon_visual_timer_max);
+                            Gfx.fill_circle(visual_pos.x, visual_pos.y, 10, Col.WHITE);
                             all_visuals_complete = false;
                         }
                     }
