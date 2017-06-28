@@ -98,7 +98,7 @@ class Game {
     static inline var DRAW_CARD_LEVEL = true;
     static inline var ARROW_HACK = false;
     static inline var DRAW_LOS_DEBUG = false;
-    var GOD_MODE = true;
+    var GOD_MODE = false;
 
     static var default_card_type = null;
     static var default_arcana_type = null;
@@ -305,13 +305,14 @@ class Game {
     CardType_Shop,
     ];
     var card_type_chances: Array<Chance> = [
-    {val: 8, min: 0, max: 1},
+    {val: 80, min: 0, max: 1},
     {val: 2, min: 0, max: 2},
     {val: 10, min: 0, max: 2},
     {val: 100, min: 2, max: 8},
-    {val: 30, min: 0, max: 1},
+    {val: 10, min: 0, max: 1},
     ];
 
+    // Real values
     // var card_type_chances: Array<Chance> = [
     // {val: 1, min: 0, max: 1},
     // {val: 1, min: 0, max: 2},
@@ -319,6 +320,80 @@ class Game {
     // {val: 15, min: 2, max: 8},
     // {val: 1, min: 0, max: 1},
     // ];
+
+    var treasure_order = [
+    ItemType_Consumable,
+    ItemType_Bomb,
+    ItemType_Arrows,
+    ItemType_Armor,
+    ItemType_Money,
+    ];
+    var treasure_chances: Array<Chance> = [
+    {val: 4, min: 0, max: 5},
+    {val: 4, min: 0, max: 5},
+    {val: 2, min: 0, max: 5},
+    {val: 4, min: 0, max: 5},
+    {val: 20, min: 0, max: 5},
+    ];
+
+    // Real values
+    // var treasure_chances: Array<Chance> = [
+    // {val: 4, min: 0, max: 5},
+    // {val: 4, min: 0, max: 5},
+    // {val: 2, min: 0, max: 5},
+    // {val: 4, min: 0, max: 5},
+    // {val: 2, min: 0, max: 5},
+    // ];
+
+    var shop_order = [
+    ItemType_Consumable,
+    ItemType_Bomb,
+    ItemType_Arrows,
+    ItemType_Armor,
+    ];
+    var shop_chances: Array<Chance> = [
+    {val: 4, min: 0, max: 5},
+    {val: 4, min: 0, max: 5},
+    {val: 2, min: 0, max: 5},
+    {val: 40, min: 0, max: 5},
+    ];
+
+    var weapon_order = [
+    WeaponType_Sword,
+    WeaponType_Spear,
+    WeaponType_Bow,
+    WeaponType_Laser,
+    ];
+    var weapon_chances: Array<Chance> = [
+    {val: 4, min: 0, max: 5},
+    {val: 4, min: 0, max: 5},
+    {val: 4, min: 0, max: 5},
+    {val: 1, min: 0, max: 2},
+    ];
+
+    var armor_order = [
+    ArmorType_Chest,
+    ArmorType_Legs,
+    ArmorType_Head,
+    ];
+    var armor_chances: Array<Chance> = [
+    {val: 4, min: 0, max: 5},
+    {val: 4, min: 0, max: 5},
+    {val: 4, min: 0, max: 5},
+    ];
+
+    var dude_order = [
+    DudeType_Follower,
+    DudeType_Stander,
+    DudeType_Shooter,
+    DudeType_Ghost,
+    ];
+    var dude_chances: Array<Chance> = [
+    {val: 8, min: 0, max: 10},
+    {val: 4, min: 0, max: 8},
+    {val: 3, min: 0, max: 5},
+    {val: 2, min: 0, max: 5},
+    ];
 
     function generate_card_type():Dynamic {
         var type = CardType_None;
@@ -376,66 +451,6 @@ class Game {
         card.completed = true; // only used for dude card type
         card.my_dudes.splice(0, card.my_dudes.length);
     }
-
-    var treasure_order = [
-    ItemType_Consumable,
-    ItemType_Bomb,
-    ItemType_Arrows,
-    ItemType_Armor,
-    ItemType_Money,
-    ];
-    var treasure_chances: Array<Chance> = [
-    {val: 4, min: 0, max: 5},
-    {val: 4, min: 0, max: 5},
-    {val: 2, min: 0, max: 5},
-    {val: 4, min: 0, max: 5},
-    {val: 20, min: 0, max: 5},
-    ];
-
-    // var treasure_chances: Array<Chance> = [
-    // {val: 4, min: 0, max: 5},
-    // {val: 4, min: 0, max: 5},
-    // {val: 2, min: 0, max: 5},
-    // {val: 4, min: 0, max: 5},
-    // {val: 2, min: 0, max: 5},
-    // ];
-
-    var shop_order = [
-    ItemType_Consumable,
-    ItemType_Bomb,
-    ItemType_Arrows,
-    ItemType_Armor,
-    ];
-    var shop_chances: Array<Chance> = [
-    {val: 4, min: 0, max: 5},
-    {val: 4, min: 0, max: 5},
-    {val: 2, min: 0, max: 5},
-    {val: 40, min: 0, max: 5},
-    ];
-
-    var weapon_order = [
-    WeaponType_Sword,
-    WeaponType_Spear,
-    WeaponType_Bow,
-    WeaponType_Laser,
-    ];
-    var weapon_chances: Array<Chance> = [
-    {val: 4, min: 0, max: 5},
-    {val: 4, min: 0, max: 5},
-    {val: 4, min: 0, max: 5},
-    {val: 1, min: 0, max: 2},
-    ];
-
-    var armor_order = [
-    ArmorType_Chest,
-    ArmorType_Legs,
-    ArmorType_Head,
-    ];
-    var armor_chances: Array<Chance> = [
-    {val: 4, min: 0, max: 5},
-    {val: 4, min: 0, max: 5},
-    {val: 4, min: 0, max: 5},
-    ];
 
     function generate_card(card:Card) {
         var k = Random.int(0, Walls.all.length - 1);
@@ -656,7 +671,7 @@ class Game {
                 dude.hp_max = Std.int(Math.max(min_hp, Math.ceil(card_level * (2.4 + Random.float(-0.5, 0.5)) / number_of_dudes)));
                 dude.hp = dude.hp_max;
                 dude.dmg = Std.int(Math.max(min_hp, Math.ceil(card_level * (1.4 + Random.float(-0.5, 0.5)))));
-                dude.type = random_enum(DudeType, 1);
+                dude.type = get_chance(DudeType, dude_order, dude_chances);
             }
 
             // Spawn items
@@ -774,6 +789,8 @@ class Game {
         }
     }
 
+    // Arcana timer is used both for arcanas that are timed by turns and 
+    // arcanas that are timed by card spawns!
     function do_arcana_magic(type: ArcanaType) {
         switch (type) {
             case ArcanaType_None:
@@ -882,7 +899,10 @@ class Game {
                 }
                 make_message("All walls were destroyed");
             }
-            // case ArcanaType_Fortune:
+            case ArcanaType_Fortune: {
+                arcana_timer = 15;
+                make_message("All money is doubled for some time");
+            }
             case ArcanaType_Justice: {
                 var player_card = card_at_position(player.x, player.y);
 
@@ -907,13 +927,57 @@ class Game {
                 arcana_timer = 5;
                 make_message("Cards might have more items for some time");
             }
-            // case ArcanaType_Devil:
-            // case ArcanaType_Tower:
-            // case ArcanaType_Moon:
+            case ArcanaType_Devil: {
+                arcana_timer = 15;
+                make_message("All damage dealt is doubled for some time");
+            }
+            case ArcanaType_Tower: {
+                for (i in 0...inventory_slots) {
+                    if (inventory[i] != null && inventory[i].type == ItemType_Armor) 
+                    {
+                        inventory[i].value = inventory[i].value_max;
+                    }
+                }
+                make_message("All armor has been repaired");
+            }
+            case ArcanaType_Moon: {
+                arcana_timer = 10;
+                make_message("Health is slowly regenerated");
+            }
             case ArcanaType_Sun: {
                 arcana_timer = 10;
             }
-            case ArcanaType_Judgement:
+            case ArcanaType_Judgement: {
+                make_message("All cards were recovered");
+                var player_card = card_at_position(player.x, player.y);
+                for (x in 0...cardmap_width) {
+                    for (y in 0...cardmap_height) {
+                        var card = cards[x][y];
+                        if (!card.covered && (card.x != player_card.x || card.y != player_card.y)) {
+                            reset_card(card);
+                            cards_covered++;
+                            card.covered = true;
+
+                            card.type = generate_card_type();
+                            if (default_card_type != null) {
+                                card.type = default_card_type;
+                            }
+
+                            generate_card(card);
+
+                            card.level = card_level;
+
+                            card_level_increment_timer--;
+                            if (card_level_increment_timer <= 0) {
+                                card_level++;
+                                card_level_increment_timer = Random.int(card_level_increment_timer_min, card_level_increment_timer_max); 
+                            }
+
+                            card.just_updated_timer = 60;
+                        }
+                    }
+                }
+            }
             default: {
                 make_message("This arcana is not implemented");
             }
@@ -1328,21 +1392,21 @@ class Game {
     }
 
     function unequip(item: Item) {
+        for (i in 0...inventory.length) {
+            if (inventory[i] != null && inventory[i] == item) {
+                inventory[i] = null;
+                break;
+            }
+        }
+
         if (item.type == ItemType_Armor) {
             player.armor -= item.value;
-            if (item.hp_bonus != 0) {
-                player.hp_max -= item.hp_bonus;
-                // player hp can't go below 1 from armor hp bonus
-                if (player.hp <= 0) {
-                    player.hp_max = 1;
-                }
-            }
         } else if (item.type == ItemType_Weapon) {
             player.weapon = WeaponType_None;
         } else if (item.type == ItemType_Arrows && player.weapon == WeaponType_Bow) {
             var have_arrows = false;
             for (i in 0...inventory.length) {
-                if (inventory[i] != null && inventory[i] != item && inventory[i].type == ItemType_Arrows && inventory[i].amount > 0) {
+                if (inventory[i] != null && inventory[i].type == ItemType_Arrows && inventory[i].amount > 0) {
                     have_arrows = true;
                     break;
                 }
@@ -1356,16 +1420,11 @@ class Game {
         }
     }
 
-    function equip(item: Item) {
+    function equip(item: Item, slot: Int) {
+        inventory[slot] = item;
+
         if (item.type == ItemType_Armor) {
             player.armor += item.value;
-            if (item.hp_bonus != 0) {
-                player.hp_max += item.hp_bonus;
-                // player hp can't go below 1 from armor hp bonus
-                if (player.hp <= 0) {
-                    player.hp_max = 1;
-                }
-            }
         } else if (item.type == ItemType_Weapon) {
             if (item.weapon_type == WeaponType_Bow) {
                 // Change weapon to bow only if there are arrows to shoot, otherwise player attacks default to fists
@@ -1397,6 +1456,22 @@ class Game {
 
             if (have_bow) {
                 player.weapon = WeaponType_Bow;
+            }
+        }
+
+        if (item.hp_bonus != 0) {
+            for (i in 0...inventory_slots) {
+                // Add up all hp bonuses again with the new item
+                player.hp_max = player.default_hp_max;
+                for (i in 0...inventory_slots) {
+                    if (inventory[i] != null && inventory[i].type == ItemType_Armor) {
+                        player.hp_max += inventory[i].hp_bonus;
+                    }
+                }
+                // player hp can't go below 1 from armor hp bonus
+                if (player.hp <= 0) {
+                    player.hp_max = 1;
+                }
             }
         }
     }
@@ -1643,7 +1718,7 @@ class Game {
                 }
 
                 if (clicked_item != null) {
-                    if (Mouse.left_click()) {
+                    if (Mouse.right_click()) {
                         // Drag start
                         if (Input.pressed(Key.SHIFT)) {
                             // Map items
@@ -1691,9 +1766,8 @@ class Game {
                                 equipped_weapon.on_ground = true;
                             }
 
-                            equip(clicked_item);
+                            equip(clicked_item, equipped_weapon_inventory_slot);
                             clicked_item.on_ground = false;
-                            inventory[equipped_weapon_inventory_slot] = clicked_item;
                         } else if (clicked_item.type == ItemType_Armor) {
                             var equipped_armor: Item = null;
                             var equipped_armor_inventory_slot = 0;
@@ -1725,9 +1799,8 @@ class Game {
                                 equipped_armor.on_ground = true;
                             }
 
-                            equip(clicked_item);
+                            equip(clicked_item, equipped_armor_inventory_slot);
                             clicked_item.on_ground = false;
-                            inventory[equipped_armor_inventory_slot] = clicked_item;
                         } else {
 
                             if (clicked_item.type == ItemType_Money) {
@@ -1739,9 +1812,8 @@ class Game {
 
                                 for (i in 0...inventory_slots) {
                                     if (inventory[i] == null) {
-                                        equip(clicked_item);
+                                        equip(clicked_item, i);
                                         clicked_item.on_ground = false;
-                                        inventory[i] = clicked_item;
                                         open_slot_found = true;
                                         break;
                                     }
@@ -1752,7 +1824,7 @@ class Game {
                                 }
                             }
                         }
-                    } else if (Mouse.right_click()) {
+                    } else if (Mouse.left_click()) {
                         if (clicked_item.type == ItemType_Consumable && clicked_item.consumable_type == ConsumableType_Potion) {
                             consume_potion(clicked_item);
                             state = GameState_PlayerVisual; // using a potion takes a turn
@@ -1761,8 +1833,8 @@ class Game {
                 }
             } else {
                 // Inventory item
-                // left click = drag onto ground
-                // right click = use if consumable
+                // right click = drag onto ground
+                // left click = use if consumable
 
                 var clicked_item: Item = null;
                 var clicked_slot = 0;
@@ -1780,14 +1852,14 @@ class Game {
                 }
 
                 if (clicked_item != null) {
-                    if (Mouse.left_click()) {
+                    if (Mouse.right_click()) {
                         state = GameState_ItemDrag;
                         dragged_item = clicked_item;
                         drag_dx = Mouse.x - inventory_x;
                         drag_dy = Mouse.y - inventory_y - clicked_slot * inventory_slot_size;
                         dragged_item_inventory_slot = clicked_slot;
                         inventory[clicked_slot] = null;
-                    } else if (Mouse.right_click()) {
+                    } else if (Mouse.left_click()) {
                         if (clicked_item.type == ItemType_Consumable && clicked_item.consumable_type == ConsumableType_Potion) {
                             consume_potion(clicked_item);
                             inventory[clicked_slot] = null;
@@ -1803,7 +1875,7 @@ class Game {
 
     function update_item_drag() {
 
-        if (Mouse.left_released()) {
+        if (Mouse.right_released()) {
             var put_in_inventory = false;
             var put_in_trash = false;
             var slot_index = -1;
@@ -1872,8 +1944,7 @@ class Game {
                         inventory[slot_index].y = dragged_item.y;
                         inventory[slot_index].on_ground = true;
                     }
-                    equip(dragged_item);
-                    inventory[slot_index] = dragged_item;
+                    equip(dragged_item, slot_index);
                     dragged_item.on_ground = false;
                     dragged_item.x = -1;
                     dragged_item.y = -1;
@@ -2154,6 +2225,10 @@ class Game {
                     break;
                 }
             }
+            // Devil arcana doubles damage
+            if (active_arcana == ArcanaType_Devil && arcana_timer > 0) {
+                attack_damage *= 2;
+            }
             if (GOD_MODE) {
                 attack_damage = 100000;
             }
@@ -2222,6 +2297,13 @@ class Game {
                 } else {
                     dude.hit = true;
                 }
+            }
+        }
+        // Moon arcana recharges health
+        if (active_arcana == ArcanaType_Moon && arcana_timer > 0) {
+            player.hp++;
+            if (player.hp > player.hp_max) {
+                player.hp = player.hp_max;
             }
         }
         player.moved = false;
@@ -2401,13 +2483,19 @@ class Game {
 
         render();
 
-        if (arcana_timer > 0 && (active_arcana == ArcanaType_Lovers 
-            || active_arcana == ArcanaType_Sun
-            || active_arcana == ArcanaType_HangedMan)
+        // Time based arcanas here
+        if (arcana_timer > 0 && 
+            (active_arcana == ArcanaType_Lovers 
+                || active_arcana == ArcanaType_Sun
+                || active_arcana == ArcanaType_HangedMan
+                || active_arcana == ArcanaType_Devil
+                || active_arcana == ArcanaType_Moon
+                || active_arcana == ArcanaType_Fortune)
             ) 
         {
             arcana_timer--;
             if (arcana_timer <= 0) {
+                make_message('$active_arcana has ended');
                 active_arcana = null;
             }
         }
@@ -2577,6 +2665,7 @@ class Game {
                     armor_queue.push(inventory[i]);
                 }
             }
+            trace(armor_queue.length);
             armor_queue.sort(function(x, y) 
             { 
                 return x.value - y.value;
@@ -2585,6 +2674,8 @@ class Game {
             var hit_armor: Item = null;
             while (player.incoming_damage > 0 && armor_queue.length != 0) {
                 hit_armor = armor_queue[armor_queue.length - 1];
+
+                trace(hit_armor.value);
 
                 if (player.incoming_damage >= hit_armor.value) {
                     player.incoming_damage -= hit_armor.value;
@@ -2595,7 +2686,9 @@ class Game {
                     hit_armor.value -= player.incoming_damage;
                     player.armor -= player.incoming_damage;
                     player.incoming_damage = 0;
+                    break;
                 }
+                trace(hit_armor.value);
             }
         }
 
@@ -2753,6 +2846,17 @@ class Game {
             state = GameState_PlayerTurn;
             state_timer = 0;
             cards[flipped_card.x][flipped_card.y].covered = false;
+            // Fortune arcana doubles all money
+            if (arcana_timer > 0 && active_arcana == ArcanaType_Fortune) {
+                for (item in Entity.get(Item)) {
+                    if (item.on_ground && item.type == ItemType_Money 
+                        && Std.int(item.x / card_width) == flipped_card.x
+                        && Std.int(item.y / card_height) == flipped_card.y) 
+                    {
+                        item.amount *= 2;
+                    }
+                }
+            }
             cards_covered--;
         }
     }
@@ -2796,6 +2900,9 @@ class Game {
                 fist_damage++;
             }
         });
+        if (Input.pressed(Key.ESCAPE)) {
+            state = GameState_PlayerTurn;
+        }
         GUI.auto_text_button("Exit", function() { state = GameState_PlayerTurn; }, 3);
         Text.display((map_width - 10) * tilesize, (map_width - 3) * tilesize, "Right click items in inventory to sell them");
         Text.display((map_width - 10) * tilesize, (map_width - 2) * tilesize, "Right click items in shop to buy them");
@@ -2837,8 +2944,8 @@ class Game {
 
                 if (Mouse.right_click()) {
                     money += sell_value;
+                    unequip(hover_item);
                     hover_item.delete();
-                    inventory[hover_slot] = null;
                 }
             }
         } else {
@@ -2874,7 +2981,7 @@ class Game {
                         var free_slot_found = false;
                         for (i in 0...inventory_slots) {
                             if (inventory[i] == null) {
-                                inventory[i] = hover_item;
+                                equip(hover_item, i);
                                 free_slot_found = true;
                                 break;
                             }

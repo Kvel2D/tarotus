@@ -98,6 +98,7 @@ class Player extends Entity {
 
 	var hp = 10;
 	var hp_max = 10;
+	var default_hp_max = 10;
 	var armor = 0;
 	var incoming_damage = 0;
 
