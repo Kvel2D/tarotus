@@ -1,15 +1,11 @@
 
-MORE ITEMS
-cursed items
-statted items
-item generation rules
+special items
 
-have total stat weight so that (2weight = 1dmg/1hp or 0dmg/2hp or 3dmg/-1hp) statted items generally have less armor
-but limit +dmg stats for early game
 
 
 
 DONE:
+
 
 
 ------------------------------------------------------------------------------------------------
@@ -64,6 +60,16 @@ SHOP
 ------------------------------------------------------------------------------------------------
 NOTES
 ------------------------------------------------------------------------------------------------
+
+BONUS STATS
+	have total stat weight so that (2weight = 1dmg/1hp or 0dmg/2hp or 3dmg/-1hp) 
+	statted items generally have less armor
+	at low stat weights stuff like 5dmg/-4hp is not possible, limit really high imbalance
+	so it's like:
+	stat weight = f(card_level)
+	max imbalance = f(card_level)
+	stats = f(stat weight, max_imbalance)
+
 
 CARD MAGIC
 	$*0FOOL        uncover all cards      

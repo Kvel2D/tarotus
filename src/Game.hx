@@ -102,7 +102,7 @@ class Game {
 
     static var default_card_type = null;
     static var default_arcana_type = null;
-    static var default_item_type = null;
+    static var default_item_type = ItemType_Weapon;
     static var default_weapon_type = null;
     static var default_armor_type = null;
     static var default_consumable_type = null;
@@ -452,6 +452,126 @@ class Game {
         card.my_dudes.splice(0, card.my_dudes.length);
     }
 
+    function generate_item(order, chances, card = null): Item {            
+        var item = new Item();
+        item.on_ground = false;
+        if (card != null && card.type == CardType_Weapon) {
+            item.type = ItemType_Weapon;
+        } else {
+            item.type = get_chance(ItemType, order, chances);
+        }
+
+        if (default_item_type != null) {
+            item.type = default_item_type;
+        }
+
+        item.info += '\nI am ${item.type}!';
+
+        if (item.type == ItemType_Consumable) {
+            item.consumable_type = random_enum(ConsumableType, 1);
+            if (default_consumable_type != null) {
+                item.consumable_type = default_consumable_type;
+            }
+            item.value = 2 * card_level;
+            item.tile = Tiles.Potion;
+            item.name = "Potion";
+        } else if (item.type == ItemType_Armor) {
+            item.armor_type = get_chance(ArmorType, armor_order, armor_chances);
+            if (default_armor_type != null) {
+                item.consumable_type = default_armor_type;
+            }
+            item.name = "Armor";
+            switch (item.armor_type) {
+                case ArmorType_Chest: item.tile = Tiles.Chest;
+                case ArmorType_Head: item.tile = Tiles.Head;
+                case ArmorType_Legs: item.tile = Tiles.Legs;
+                default: item.tile = Tiles.None;
+            }
+
+            // Calculate stats
+            item.value = Std.int(Random.float(0.8, 1.2) * card_level);
+            if (item.value == 0) {
+                item.value = 1;
+            }
+            item.value_max = item.value;
+
+            var add_bonuses = Random.chance(50 + card_level * card_level);
+            if (add_bonuses) {
+                // Decrease armor of items with bonuses
+                item.value = Std.int(Math.max(1, item.value * 0.7));
+                item.value_max = item.value;
+
+                var stat_weight = Std.int(Random.float(0.75 * card_level, 1.25 * card_level));
+                if (stat_weight <= 0) {
+                    stat_weight = 1;
+                }
+                var max_imbalance = Std.int(Random.float(0.5 * card_level, card_level));
+                if (max_imbalance <= 0) {
+                    max_imbalance = 1;
+                }
+                // Split weight between hp and dmg, possibly turning one negative and not going above max_imbalance
+                if (Random.chance(50)) {
+                    item.hp_bonus = Random.pick_int(-1, 1) * Random.int(1, max_imbalance);
+                    item.dmg_bonus = stat_weight - item.hp_bonus;
+                    if (item.dmg_bonus < 0 && item.dmg_bonus < max_imbalance) {
+                        item.dmg_bonus = -max_imbalance;
+                    } else if (item.dmg_bonus > 0 && item.dmg_bonus > max_imbalance) {
+                        item.dmg_bonus = max_imbalance;
+                    }
+                } else {
+                    item.dmg_bonus = Random.pick_int(-1, 1) * Random.int(1, max_imbalance);
+                    item.hp_bonus = stat_weight - item.dmg_bonus;
+                    if (item.hp_bonus < 0 && item.hp_bonus < max_imbalance) {
+                        item.hp_bonus = -max_imbalance;
+                    } else if (item.hp_bonus > 0 && item.hp_bonus > max_imbalance) {
+                        item.hp_bonus = max_imbalance;
+                    }
+                }
+            }
+        } else if (item.type == ItemType_Weapon) {
+            item.weapon_type = get_chance(WeaponType, weapon_order, weapon_chances);
+            if (default_weapon_type != null) {
+                item.weapon_type = default_weapon_type;
+            }
+
+            item.name = "Weapon";
+            switch (item.weapon_type) {
+                case WeaponType_Sword: item.value = Math.ceil((2 * card_level) * (1 + Random.float(-0.2, 0.2)));
+                case WeaponType_Spear: item.value = Math.ceil((1 * card_level) * (1 + Random.float(-0.2, 0.2)));
+                case WeaponType_Bow: item.value = Math.ceil((1.5 * card_level) * (1 + Random.float(-0.2, 0.2)));
+                case WeaponType_Laser: {
+                    item.value = Math.ceil((3 * card_level) * (1 + Random.float(-0.2, 0.2)));
+                    item.value_max = item.value;
+                }
+                default: item.value = 0;
+            }
+            switch (item.weapon_type) {
+                case WeaponType_Sword: item.tile = Tiles.Sword;
+                case WeaponType_Spear: item.tile = Tiles.Spear;
+                case WeaponType_Bow: item.tile = Tiles.Bow;
+                default: item.tile = Tiles.None;
+            }
+
+            // Random hp bonus
+            if (Random.chance(10)) {
+                item.hp_bonus = Std.int(Random.float(0.75 * card_level, 1.25 * card_level));
+            }
+        } else if (item.type == ItemType_Arrows) {
+            item.amount = Random.int(7, 11);
+            item.tile = Tiles.Arrows;
+            item.name = "Arrows";
+        } else if (item.type == ItemType_Bomb) {
+            item.tile = Tiles.Bomb;
+            item.name = "Bomb";
+        } else if (item.type == ItemType_Money) {
+            item.tile = Tiles.Money;
+            item.name = "Money";
+            item.amount = Random.int(2, 4);
+        }
+
+        return item;
+    }
+
     function generate_card(card:Card) {
         var k = Random.int(0, Walls.all.length - 1);
         var walls_preset = Walls.all[k];
@@ -538,94 +658,6 @@ class Game {
             loop_number++;
         }
 
-        function generate_item(order, chances): Item {            
-            var item = new Item();
-            item.on_ground = false;
-            if (card.type == CardType_Weapon) {
-                item.type = ItemType_Weapon;
-            } else {
-                item.type = get_chance(ItemType, order, chances);
-            }
-
-            if (default_item_type != null) {
-                item.type = default_item_type;
-            }
-
-            item.info += '\nI am ${item.type}!';
-
-            if (item.type == ItemType_Consumable) {
-                item.consumable_type = random_enum(ConsumableType, 1);
-                if (default_consumable_type != null) {
-                    item.consumable_type = default_consumable_type;
-                }
-                item.value = 2 * card_level;
-                item.tile = Tiles.Potion;
-                item.name = "Potion";
-            } else if (item.type == ItemType_Armor) {
-                item.armor_type = get_chance(ArmorType, armor_order, armor_chances);
-                if (default_armor_type != null) {
-                    item.consumable_type = default_armor_type;
-                }
-                item.value = Std.int(Random.float(0.8, 1.2) * card_level);
-                if (item.value == 0) {
-                    item.value = 1;
-                }
-                item.value_max = item.value;
-                item.name = "Armor";
-                switch (item.armor_type) {
-                    case ArmorType_Chest: item.tile = Tiles.Chest;
-                    case ArmorType_Head: item.tile = Tiles.Head;
-                    case ArmorType_Legs: item.tile = Tiles.Legs;
-                    default: item.tile = Tiles.None;
-                }
-
-                // TODO: figure out how often items should have bonuses and the scale as well
-                if (Random.chance(100)) {
-                    if (Random.chance(50)) {
-                        item.hp_bonus = 1;
-                    } else {
-                        item.dmg_bonus = 1;
-                    }
-                }
-            } else if (item.type == ItemType_Weapon) {
-                item.weapon_type = get_chance(WeaponType, weapon_order, weapon_chances);
-                if (default_weapon_type != null) {
-                    item.weapon_type = default_weapon_type;
-                }
-
-                item.name = "Weapon";
-                switch (item.weapon_type) {
-                    case WeaponType_Sword: item.value = Math.ceil((2 * card_level) * (1 + Random.float(-0.2, 0.2)));
-                    case WeaponType_Spear: item.value = Math.ceil((1 * card_level) * (1 + Random.float(-0.2, 0.2)));
-                    case WeaponType_Bow: item.value = Math.ceil((1.5 * card_level) * (1 + Random.float(-0.2, 0.2)));
-                    case WeaponType_Laser: {
-                        item.value = Math.ceil((3 * card_level) * (1 + Random.float(-0.2, 0.2)));
-                        item.value_max = item.value;
-                    }
-                    default: item.value = 0;
-                }
-                switch (item.weapon_type) {
-                    case WeaponType_Sword: item.tile = Tiles.Sword;
-                    case WeaponType_Spear: item.tile = Tiles.Spear;
-                    case WeaponType_Bow: item.tile = Tiles.Bow;
-                    default: item.tile = Tiles.None;
-                }
-            } else if (item.type == ItemType_Arrows) {
-                item.amount = Random.int(7, 11);
-                item.tile = Tiles.Arrows;
-                item.name = "Arrows";
-            } else if (item.type == ItemType_Bomb) {
-                item.tile = Tiles.Bomb;
-                item.name = "Bomb";
-            } else if (item.type == ItemType_Money) {
-                item.tile = Tiles.Money;
-                item.name = "Money";
-                item.amount = Random.int(2, 4);
-            }
-
-            return item;
-        }
-
         function set_down_item(item) {
             var free_map = get_free_map(false);
             var free_cell = random_cell_in_card(card.x, card.y, function(x, y) { return free_map[x][y]; });
@@ -640,7 +672,7 @@ class Game {
             walls[item.x][item.y] = false;
         }
 
-        //TODO: make a better formula for item and dude values based on card level(currently simply linear)
+        //TODO: make a better formula for dude values based on card level
         if (card.type == CardType_Dude) {
             card.completed = false;
 
@@ -1330,7 +1362,7 @@ class Game {
         Text.display(inventory_x, 30, '${state}');
 
         Text.display(inventory_x, 470, 'Money: ${money}');
-        Text.display(inventory_x, 500, 'Health: ${player.hp}');
+        Text.display(inventory_x, 500, 'Health: ${player.hp}/${player.hp_max}');
         Text.display(inventory_x, 530, 'Armor: ${player.armor}');
         var player_damage = fist_damage;
         for (i in 0...inventory_slots) {
@@ -1418,6 +1450,22 @@ class Game {
                 player.weapon = WeaponType_None;
             }
         }
+
+        
+        // Reset and count all bonuses again, for safety
+        if (item.hp_bonus != 0) {
+            player.hp_max = player.default_hp_max;
+            for (i in 0...inventory_slots) {
+                // Add up all hp bonuses again with the new item
+                if (inventory[i] != null) {
+                    player.hp_max += inventory[i].hp_bonus;
+                }
+            }
+            // player hp can't go below 1 from armor hp bonus
+            if (player.hp <= 0) {
+                player.hp_max = 1;
+            }
+        }
     }
 
     function equip(item: Item, slot: Int) {
@@ -1459,19 +1507,18 @@ class Game {
             }
         }
 
+        // Reset and count all bonuses again, for safety
         if (item.hp_bonus != 0) {
+            player.hp_max = player.default_hp_max;
             for (i in 0...inventory_slots) {
                 // Add up all hp bonuses again with the new item
-                player.hp_max = player.default_hp_max;
-                for (i in 0...inventory_slots) {
-                    if (inventory[i] != null && inventory[i].type == ItemType_Armor) {
-                        player.hp_max += inventory[i].hp_bonus;
-                    }
+                if (inventory[i] != null) {
+                    player.hp_max += inventory[i].hp_bonus;
                 }
-                // player hp can't go below 1 from armor hp bonus
-                if (player.hp <= 0) {
-                    player.hp_max = 1;
-                }
+            }
+            // player hp can't go below 1 from armor hp bonus
+            if (player.hp <= 0) {
+                player.hp_max = 1;
             }
         }
     }
@@ -1665,14 +1712,11 @@ class Game {
 
         // Teleport arcana
         if (active_arcana == ArcanaType_HangedMan && state == GameState_PlayerTurn) {
-            trace(1);
             if (Mouse.left_click() || Mouse.right_click()) {
-                trace(2);
                 var x = Std.int(Mouse.x / tilesize);
                 var y = Std.int(Mouse.y / tilesize);
                 var move_map = get_free_map(false);
                 if (!out_of_bounds(x, y) && move_map[x][y]) {
-                    trace(3);
                     player.x = x;
                     player.y = y;
                     player.real_x = x * tilesize;
@@ -1718,27 +1762,27 @@ class Game {
                 }
 
                 if (clicked_item != null) {
-                    if (Mouse.right_click()) {
+                    if (Mouse.left_click()) {
                         // Drag start
-                        if (Input.pressed(Key.SHIFT)) {
-                            // Map items
-                            for (item in Entity.get(Item)) {
-                                if (item.on_ground && item.x == x && item.y == y) {
-                                    dragged_item = item;
-                                    drag_dx = Mouse.x - x * tilesize;
-                                    drag_dy = Mouse.y - y * tilesize;
-                                    break;
-                                }
+                        for (item in Entity.get(Item)) {
+                            if (item.on_ground && item.x == x && item.y == y) {
+                                dragged_item = item;
+                                drag_dx = Mouse.x - x * tilesize;
+                                drag_dy = Mouse.y - y * tilesize;
+                                break;
                             }
-                            if (dragged_item != null
-                                && Math.abs(dragged_item.x - player.x) < 2
-                                && Math.abs(dragged_item.y - player.y) < 2) 
-                            {
-                                state = GameState_ItemDrag;
-                            } else {
-                                dragged_item = null;
-                            }
-                        } else if (clicked_item.type == ItemType_Weapon) {
+                        }
+                        if (dragged_item != null
+                            && Math.abs(dragged_item.x - player.x) < 2
+                            && Math.abs(dragged_item.y - player.y) < 2) 
+                        {
+                            state = GameState_ItemDrag;
+                        } else {
+                            dragged_item = null;
+                        }
+                    } else if (Mouse.right_click()) {
+                        // Pick up or drop
+                        if (clicked_item.type == ItemType_Weapon) {
                             var equipped_weapon: Item = null;
                             var equipped_weapon_inventory_slot = 0;
 
@@ -1824,7 +1868,7 @@ class Game {
                                 }
                             }
                         }
-                    } else if (Mouse.left_click()) {
+                    } else if (Input.pressed(Key.E) && Mouse.left_click()) {
                         if (clicked_item.type == ItemType_Consumable && clicked_item.consumable_type == ConsumableType_Potion) {
                             consume_potion(clicked_item);
                             state = GameState_PlayerVisual; // using a potion takes a turn
@@ -1833,8 +1877,6 @@ class Game {
                 }
             } else {
                 // Inventory item
-                // right click = drag onto ground
-                // left click = use if consumable
 
                 var clicked_item: Item = null;
                 var clicked_slot = 0;
@@ -1852,14 +1894,14 @@ class Game {
                 }
 
                 if (clicked_item != null) {
-                    if (Mouse.right_click()) {
+                    if (Mouse.left_click()) {
                         state = GameState_ItemDrag;
                         dragged_item = clicked_item;
                         drag_dx = Mouse.x - inventory_x;
                         drag_dy = Mouse.y - inventory_y - clicked_slot * inventory_slot_size;
                         dragged_item_inventory_slot = clicked_slot;
                         inventory[clicked_slot] = null;
-                    } else if (Mouse.left_click()) {
+                    } else if (Input.pressed(Key.E) && Mouse.left_click()) {
                         if (clicked_item.type == ItemType_Consumable && clicked_item.consumable_type == ConsumableType_Potion) {
                             consume_potion(clicked_item);
                             inventory[clicked_slot] = null;
@@ -1875,7 +1917,7 @@ class Game {
 
     function update_item_drag() {
 
-        if (Mouse.right_released()) {
+        if (Mouse.left_released()) {
             var put_in_inventory = false;
             var put_in_trash = false;
             var slot_index = -1;
@@ -2133,8 +2175,6 @@ class Game {
                     Gfx.fill_tri_array(tri, Col.RED);
 
                     // Stop at wall
-                    // TODO: here visual_cell is from "bouncy weapon pos" but bow's visual pos is different
-                    // change it
                     var visual_cell_x = Std.int(visual_pos.x / tilesize);
                     var visual_cell_y = Std.int(visual_pos.y / tilesize);
                     var visual_card_x = Std.int(visual_cell_x / card_width);
@@ -2665,7 +2705,6 @@ class Game {
                     armor_queue.push(inventory[i]);
                 }
             }
-            trace(armor_queue.length);
             armor_queue.sort(function(x, y) 
             { 
                 return x.value - y.value;
@@ -2674,8 +2713,6 @@ class Game {
             var hit_armor: Item = null;
             while (player.incoming_damage > 0 && armor_queue.length != 0) {
                 hit_armor = armor_queue[armor_queue.length - 1];
-
-                trace(hit_armor.value);
 
                 if (player.incoming_damage >= hit_armor.value) {
                     player.incoming_damage -= hit_armor.value;
@@ -2688,7 +2725,6 @@ class Game {
                     player.incoming_damage = 0;
                     break;
                 }
-                trace(hit_armor.value);
             }
         }
 
@@ -3030,7 +3066,14 @@ class Game {
                     return info;
                 }
                 case ItemType_Weapon: {
-                    return 'Weapon: ${item.name}\nType: ${item.weapon_type}\nDamage: ${item.value}';
+                    var info = 'Weapon: ${item.name}\nType: ${item.weapon_type}\nDamage: ${item.value}\nHP bonus: ${item.hp_bonus}';
+                    if (item.hp_bonus != 0) {
+                        info += '\n+hp: ${item.hp_bonus}';
+                    }
+                    if (item.dmg_bonus != 0) {
+                        info += '\n+dmg: ${item.dmg_bonus}';
+                    }
+                    return info;
                 }
                 case ItemType_Arrows: {
                     return 'Arrows: ${item.name}\nAmount: ${item.amount}';
@@ -3090,10 +3133,29 @@ class Game {
             case GameState_Shop: update_shop();
         }
 
-        GUI.enum_setter(1000, 800, function(x) { player.weapon = x; }, player.weapon, WeaponType);
+        // GUI.enum_setter(1000, 800, function(x) { player.weapon = x; }, player.weapon, WeaponType);
 
         GUI.x = 1000;
         GUI.y = 750;
         GUI.auto_text_button("godmode", function() { GOD_MODE = true; });
+        GUI.auto_text_button('increment card level: ${card_level}', function() { card_level++; });
+        // Item tester
+        if (Input.just_pressed(Key.SPACE)) { 
+            for (item in Entity.get(Item)) {
+                if (item.x == player.x + 1 && item.y == player.y) {
+                    item.delete();
+                    break;
+                }
+            }
+
+            var old_default_item_type = default_item_type;
+            default_item_type = ItemType_Armor;
+            var item = generate_item(treasure_order, treasure_chances);
+            default_item_type = old_default_item_type;
+
+            item.on_ground = true;
+            item.x = player.x + 1;
+            item.y = player.y;
+        }
     }
 }
