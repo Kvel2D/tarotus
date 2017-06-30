@@ -49,6 +49,8 @@ enum ArcanaType {
     ArcanaType_Moon;
     ArcanaType_Sun;
     ArcanaType_Judgement;
+    ArcanaType_DamagePotion;
+    ArcanaType_SpeedPotion;
 }
 
 @:publicFields
@@ -102,10 +104,10 @@ class Game {
 
     static var default_card_type = null;
     static var default_arcana_type = null;
-    static var default_item_type = ItemType_Weapon;
+    static var default_item_type = ItemType_Consumable;
     static var default_weapon_type = null;
     static var default_armor_type = null;
-    static var default_consumable_type = null;
+    static var default_consumable_type = ConsumableType_Damage;
 
     static inline var tilesize = 64;
     static inline var cardmap_width = 5;
@@ -1376,7 +1378,13 @@ class Game {
                 player_damage += inventory[i].dmg_bonus;
             }
         }
-        Text.display(inventory_x, 560, 'Damage: ${player_damage}');
+        var damage = player_damage;
+        if (active_arcana == ArcanaType_DamagePotion && arcana_timer > 0) {
+            damage++;
+        } else if (active_arcana == ArcanaType_Devil && arcana_timer > 0) {
+            damage *= 2;
+        }
+        Text.display(inventory_x, 560, 'Damage: ${damage}');
         Text.display(inventory_x, 600, hover_info);
 
         if (message_timer > 0) {
@@ -1727,9 +1735,23 @@ class Game {
         }
 
         function consume_potion(potion) {
-            player.hp += potion.value;
-            if (player.hp > player.hp_max) {
-                player.hp = player.hp_max;
+            switch(potion.consumable_type) {
+                case ConsumableType_Healing: {
+                    player.hp += potion.value;
+                    if (player.hp > player.hp_max) {
+                        player.hp = player.hp_max;
+                    }   
+                }
+                case ConsumableType_Damage: {
+                    arcana_timer = 20;
+                    active_arcana = ArcanaType_DamagePotion;
+                }
+                case ConsumableType_Speed: {
+                    arcana_timer = 20;
+                    active_arcana = ArcanaType_SpeedPotion;
+                }
+                default: trace('${potion.consumable_type} is unhandled 
+                    in update_player_turn()');
             }
             potion.delete();
         }
@@ -1755,10 +1777,6 @@ class Game {
                     && (Math.abs(clicked_item.x - player.x) >= 2 || Math.abs(clicked_item.y - player.y) >= 2)) 
                 {
                     clicked_item = null;
-                }
-
-                function pick_up_money(item) {
-
                 }
 
                 if (clicked_item != null) {
@@ -1868,11 +1886,6 @@ class Game {
                                 }
                             }
                         }
-                    } else if (Input.pressed(Key.E) && Mouse.left_click()) {
-                        if (clicked_item.type == ItemType_Consumable && clicked_item.consumable_type == ConsumableType_Potion) {
-                            consume_potion(clicked_item);
-                            state = GameState_PlayerVisual; // using a potion takes a turn
-                        }
                     }
                 }
             } else {
@@ -1881,7 +1894,7 @@ class Game {
                 var clicked_item: Item = null;
                 var clicked_slot = 0;
 
-                // Inventory items, drop onto ground
+                // Find item under mouse
                 for (i in 0...inventory_slots) {
                     if (inventory[i] != null
                         && Math.point_box_intersect(Mouse.x, Mouse.y, inventory_x, inventory_y + i * inventory_slot_size,
@@ -1901,8 +1914,8 @@ class Game {
                         drag_dy = Mouse.y - inventory_y - clicked_slot * inventory_slot_size;
                         dragged_item_inventory_slot = clicked_slot;
                         inventory[clicked_slot] = null;
-                    } else if (Input.pressed(Key.E) && Mouse.left_click()) {
-                        if (clicked_item.type == ItemType_Consumable && clicked_item.consumable_type == ConsumableType_Potion) {
+                    } else if (Mouse.right_click()) {
+                        if (clicked_item.type == ItemType_Consumable) {
                             consume_potion(clicked_item);
                             inventory[clicked_slot] = null;
                             state = GameState_PlayerVisual;
@@ -2265,6 +2278,10 @@ class Game {
                     break;
                 }
             }
+            // Damage potion adds damage
+            if (active_arcana == ArcanaType_DamagePotion && arcana_timer > 0) {
+                attack_damage++;
+            }
             // Devil arcana doubles damage
             if (active_arcana == ArcanaType_Devil && arcana_timer > 0) {
                 attack_damage *= 2;
@@ -2352,154 +2369,158 @@ class Game {
         player.dy = 0;
 
         // Enemies do stuff after player
-        for (dude in Entity.get(Dude)) {
-            if (dude.active && !dude.dead) {
-                switch (dude.type) {
-                    case DudeType_Follower: {
-                        if (active_arcana == ArcanaType_Lovers) {
-                            // Enemies move randomly without attacking during lovers arcana
-                            var move_map = get_free_map();
-                            function random_nearby_cell(x, y): IntVector2 {
-                                for (dx in -1...2) {
-                                    for (dy in -1...2) {
-                                        if (Math.abs(dx + dy) == 1 
-                                            && !out_of_bounds( x+ dx, y + dy) 
-                                            && move_map[x + dx][y + dy]) 
-                                        {
-                                            return {x: x + dx, y: y + dy};
+        // Speed potion makes enemies skip every other turn
+        if (!(active_arcana == ArcanaType_SpeedPotion && arcana_timer > 0)
+            || (active_arcana == ArcanaType_SpeedPotion && arcana_timer > 0) && arcana_timer % 2 == 0) {
+            for (dude in Entity.get(Dude)) {
+                if (dude.active && !dude.dead) {
+                    switch (dude.type) {
+                        case DudeType_Follower: {
+                            if (active_arcana == ArcanaType_Lovers) {
+                                // Enemies move randomly without attacking during lovers arcana
+                                var move_map = get_free_map();
+                                function random_nearby_cell(x, y): IntVector2 {
+                                    for (dx in -1...2) {
+                                        for (dy in -1...2) {
+                                            if (Math.abs(dx + dy) == 1 
+                                                && !out_of_bounds( x+ dx, y + dy) 
+                                                && move_map[x + dx][y + dy]) 
+                                            {
+                                                return {x: x + dx, y: y + dy};
+                                            }
                                         }
                                     }
+                                    return {x: -1, y: -1};
                                 }
-                                return {x: -1, y: -1};
-                            }
-                            var cell = random_nearby_cell(dude.x, dude.y);
-                            if (cell.x != -1) {
-                                dude.moved = true;
-                                dude.dx = cell.x - dude.x;
-                                dude.dy = cell.y - dude.y;
-                            }
-                        } else {
-                            // Check if dude can see player
-                            if (!dude.following_player) {
-                                var can_see_player = true;
-                                dude.points = new Array<IntVector2>();
-                                // Check points on a line between dude and player
-                                var x0 = dude.x;
-                                var y0 = dude.y;
-                                var x1 = player.x;
-                                var y1 = player.y;
-                                var dx = (x1 - x0) / 50.0;
-                                var dy = (y1 - y0) / 50.0;
-                                var x = x0;
-                                var y = y0;
-                                var prev_x = x;
-                                var prev_y = y;
-                                for (t in 0...50) {
-                                    x = Std.int(x0 + dx * t);
-                                    y = Std.int(y0 + dy * t);
-                                    if (x != prev_x || y != prev_y) {
-                                        dude.points.push({x: x, y: y});
-                                        if (walls[x][y]) {
-                                            can_see_player = false;
+                                var cell = random_nearby_cell(dude.x, dude.y);
+                                if (cell.x != -1) {
+                                    dude.moved = true;
+                                    dude.dx = cell.x - dude.x;
+                                    dude.dy = cell.y - dude.y;
+                                }
+                            } else {
+                                // Check if dude can see player
+                                if (!dude.following_player) {
+                                    var can_see_player = true;
+                                    dude.points = new Array<IntVector2>();
+                                    // Check points on a line between dude and player
+                                    var x0 = dude.x;
+                                    var y0 = dude.y;
+                                    var x1 = player.x;
+                                    var y1 = player.y;
+                                    var dx = (x1 - x0) / 50.0;
+                                    var dy = (y1 - y0) / 50.0;
+                                    var x = x0;
+                                    var y = y0;
+                                    var prev_x = x;
+                                    var prev_y = y;
+                                    for (t in 0...50) {
+                                        x = Std.int(x0 + dx * t);
+                                        y = Std.int(y0 + dy * t);
+                                        if (x != prev_x || y != prev_y) {
+                                            dude.points.push({x: x, y: y});
+                                            if (walls[x][y]) {
+                                                can_see_player = false;
+                                            }
+                                            prev_x = x;
+                                            prev_y = y;
                                         }
-                                        prev_x = x;
-                                        prev_y = y;
+                                    }
+
+                                    if (can_see_player) {
+                                        dude.following_player = true;
                                     }
                                 }
 
-                                if (can_see_player) {
-                                    dude.following_player = true;
+                                // Dude has seen the player and is following him
+                                if (dude.following_player) {
+                                    var dude_player_dx = player.x - dude.x;
+                                    var dude_player_dy = player.y - dude.y;
+                                    // Attack if next to player
+                                    if (Math.abs(dude_player_dx) + Math.abs(dude_player_dy) == 1) {
+                                        dude.attacked = true;
+                                        if (!player.moved) {
+                                            player.incoming_damage += dude.dmg;
+                                        }
+                                        dude.dx = Math.sign(dude_player_dx);
+                                        dude.dy = Math.sign(dude_player_dy);
+                                    }
+
+                                    // Otherwise chase player(to the new position)
+                                    if (!dude.attacked) {
+                                        var path = a_star(dude.x, dude.y, player.x, player.y);
+                                        if (path.length > 1) {
+                                            dude.moved = true;
+                                            dude.dx = path[path.length - 2].x - dude.x;
+                                            dude.dy = path[path.length - 2].y - dude.y;
+                                        }
+                                    }
                                 }
                             }
-
-                            // Dude has seen the player and is following him
-                            if (dude.following_player) {
-                                var dude_player_dx = player.x - dude.x;
-                                var dude_player_dy = player.y - dude.y;
-                                // Attack if next to player
-                                if (Math.abs(dude_player_dx) + Math.abs(dude_player_dy) == 1) {
-                                    dude.attacked = true;
-                                    if (!player.moved) {
+                        }
+                        case DudeType_Shooter: {
+                            var dude_player_dx = player.x - dude.x;
+                            var dude_player_dy = player.y - dude.y;
+                            if (dude_player_dx == 0 || dude_player_dy == 0) {
+                                var x: Int = Std.int(dude.x);
+                                var y: Int = Std.int(dude.y);
+                                while (true) {
+                                    x += Std.int(dude_player_dx); 
+                                    y += Std.int(dude_player_dy);
+                                    if (out_of_bounds(x, y) || walls[x][y]) {
+                                        break;
+                                    } else if (!out_of_bounds(x, y) && x == player.x && y == player.y) {
+                                        dude.attacked = true;
                                         player.incoming_damage += dude.dmg;
-                                    }
-                                    dude.dx = Math.sign(dude_player_dx);
-                                    dude.dy = Math.sign(dude_player_dy);
-                                }
-
-                                // Otherwise chase player(to the new position)
-                                if (!dude.attacked) {
-                                    var path = a_star(dude.x, dude.y, player.x, player.y);
-                                    if (path.length > 1) {
-                                        dude.moved = true;
-                                        dude.dx = path[path.length - 2].x - dude.x;
-                                        dude.dy = path[path.length - 2].y - dude.y;
+                                        dude.dx = Math.sign(dude_player_dx);
+                                        dude.dy = Math.sign(dude_player_dy);
+                                        break;
                                     }
                                 }
                             }
                         }
-                    }
-                    case DudeType_Shooter: {
-                        var dude_player_dx = player.x - dude.x;
-                        var dude_player_dy = player.y - dude.y;
-                        if (dude_player_dx == 0 || dude_player_dy == 0) {
-                            var x: Int = Std.int(dude.x);
-                            var y: Int = Std.int(dude.y);
-                            while (true) {
-                                x += Std.int(dude_player_dx); 
-                                y += Std.int(dude_player_dy);
-                                if (out_of_bounds(x, y) || walls[x][y]) {
-                                    break;
-                                } else if (!out_of_bounds(x, y) && x == player.x && y == player.y) {
-                                    dude.attacked = true;
-                                    player.incoming_damage += dude.dmg;
-                                    dude.dx = Math.sign(dude_player_dx);
-                                    dude.dy = Math.sign(dude_player_dy);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    case DudeType_Stander: {
-                        var dude_player_dx = player.x - dude.x;
-                        var dude_player_dy = player.y - dude.y;
-                        if (Math.abs(dude_player_dx) + Math.abs(dude_player_dy) == 1) {
-                            dude.attacked = true;
-                            player.incoming_damage += dude.dmg;
-                            dude.dx = dude_player_dx;
-                            dude.dy = dude_player_dy;
-                        }
-                    }
-                    case DudeType_Ghost: {
-                        var dude_player_dx = player.x - dude.x;
-                        var dude_player_dy = player.y - dude.y;
-                        // Attack if next to player
-                        if (Math.abs(dude_player_dx) + Math.abs(dude_player_dy) == 1) {
-                            dude.attacked = true;
-                            if (!player.moved) {
+                        case DudeType_Stander: {
+                            var dude_player_dx = player.x - dude.x;
+                            var dude_player_dy = player.y - dude.y;
+                            if (Math.abs(dude_player_dx) + Math.abs(dude_player_dy) == 1) {
+                                dude.attacked = true;
                                 player.incoming_damage += dude.dmg;
+                                dude.dx = dude_player_dx;
+                                dude.dy = dude_player_dy;
                             }
-                            dude.dx = Math.sign(dude_player_dx);
-                            dude.dy = Math.sign(dude_player_dy);
                         }
-
-                        // Otherwise chase player(to the new position)
-                        if (!dude.attacked) {
-                            if (Random.chance(65)) {
-                                dude.moved = true;
+                        case DudeType_Ghost: {
+                            var dude_player_dx = player.x - dude.x;
+                            var dude_player_dy = player.y - dude.y;
+                            // Attack if next to player
+                            if (Math.abs(dude_player_dx) + Math.abs(dude_player_dy) == 1) {
+                                dude.attacked = true;
+                                if (!player.moved) {
+                                    player.incoming_damage += dude.dmg;
+                                }
                                 dude.dx = Math.sign(dude_player_dx);
                                 dude.dy = Math.sign(dude_player_dy);
-                                // Stop ghost from moving onto player
-                                if (Math.abs(dude_player_dx) == 1 && Math.abs(dude_player_dy) == 1) {
-                                    if (Random.chance(50)) {
-                                        dude.dx = 0;
-                                    } else {
-                                        dude.dy = 0;
+                            }
+
+                            // Otherwise chase player(to the new position)
+                            if (!dude.attacked) {
+                                if (Random.chance(65)) {
+                                    dude.moved = true;
+                                    dude.dx = Math.sign(dude_player_dx);
+                                    dude.dy = Math.sign(dude_player_dy);
+                                    // Stop ghost from moving onto player
+                                    if (Math.abs(dude_player_dx) == 1 && Math.abs(dude_player_dy) == 1) {
+                                        if (Random.chance(50)) {
+                                            dude.dx = 0;
+                                        } else {
+                                            dude.dy = 0;
+                                        }
                                     }
                                 }
                             }
                         }
+                        default: trace("Unhandled dude type in update_player_turn_result()!");
                     }
-                    default: trace("Unhandled dude type in update_player_turn_result()!");
                 }
             }
         }
@@ -2530,7 +2551,9 @@ class Game {
                 || active_arcana == ArcanaType_HangedMan
                 || active_arcana == ArcanaType_Devil
                 || active_arcana == ArcanaType_Moon
-                || active_arcana == ArcanaType_Fortune)
+                || active_arcana == ArcanaType_Fortune
+                || active_arcana == ArcanaType_DamagePotion
+                || active_arcana == ArcanaType_SpeedPotion)
             ) 
         {
             arcana_timer--;

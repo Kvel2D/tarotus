@@ -18,7 +18,9 @@ enum ItemType {
 
 enum ConsumableType {
 	ConsumableType_None;
-	ConsumableType_Potion;
+	ConsumableType_Healing;
+	ConsumableType_Damage;
+	ConsumableType_Speed;
 }
 
 enum ArmorType {
