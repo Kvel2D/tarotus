@@ -104,10 +104,10 @@ class Game {
 
     static var default_card_type = null;
     static var default_arcana_type = null;
-    static var default_item_type = ItemType_Consumable;
+    static var default_item_type = null;
     static var default_weapon_type = null;
     static var default_armor_type = null;
-    static var default_consumable_type = ConsumableType_Damage;
+    static var default_consumable_type = null;
 
     static inline var tilesize = 64;
     static inline var cardmap_width = 5;
@@ -228,17 +228,6 @@ class Game {
         }
 
         walls[player.x][player.y] = false;
-
-
-        if (ARROW_HACK) {
-            var arrows = new Item();
-            arrows.type = ItemType_Arrows;
-            arrows.amount = 99;
-            arrows.tile = Tiles.Arrows;
-            arrows.name = "Arrows";
-            arrows.on_ground = false;
-            inventory[inventory_slots - 1] = arrows;
-        }
     }
 
     // start_index is used to skip EnumType_None
@@ -306,58 +295,51 @@ class Game {
     CardType_Dude,
     CardType_Shop,
     ];
-    var card_type_chances: Array<Chance> = [
-    {val: 80, min: 0, max: 1},
-    {val: 2, min: 0, max: 2},
-    {val: 10, min: 0, max: 2},
-    {val: 100, min: 2, max: 8},
-    {val: 10, min: 0, max: 1},
-    ];
-
-    // Real values
     // var card_type_chances: Array<Chance> = [
-    // {val: 1, min: 0, max: 1},
-    // {val: 1, min: 0, max: 2},
+    // {val: 80, min: 0, max: 1},
     // {val: 2, min: 0, max: 2},
-    // {val: 15, min: 2, max: 8},
-    // {val: 1, min: 0, max: 1},
+    // {val: 10, min: 0, max: 2},
+    // {val: 100, min: 2, max: 8},
+    // {val: 10, min: 0, max: 1},
     // ];
+    // Real values
+    var card_type_chances: Array<Chance> = [
+    {val: 1, min: 0, max: 1},
+    {val: 1, min: 0, max: 2},
+    {val: 2, min: 0, max: 2},
+    {val: 15, min: 2, max: 8},
+    {val: 1, min: 0, max: 1},
+    ];
 
     var treasure_order = [
     ItemType_Consumable,
     ItemType_Bomb,
-    ItemType_Arrows,
     ItemType_Armor,
     ItemType_Money,
     ];
-    var treasure_chances: Array<Chance> = [
-    {val: 4, min: 0, max: 5},
-    {val: 4, min: 0, max: 5},
-    {val: 2, min: 0, max: 5},
-    {val: 4, min: 0, max: 5},
-    {val: 20, min: 0, max: 5},
-    ];
-
-    // Real values
     // var treasure_chances: Array<Chance> = [
     // {val: 4, min: 0, max: 5},
     // {val: 4, min: 0, max: 5},
-    // {val: 2, min: 0, max: 5},
     // {val: 4, min: 0, max: 5},
-    // {val: 2, min: 0, max: 5},
+    // {val: 20, min: 0, max: 5},
     // ];
+    // Real values
+    var treasure_chances: Array<Chance> = [
+    {val: 4, min: 0, max: 5},
+    {val: 4, min: 0, max: 5},
+    {val: 4, min: 0, max: 5},
+    {val: 2, min: 0, max: 5},
+    ];
 
     var shop_order = [
     ItemType_Consumable,
     ItemType_Bomb,
-    ItemType_Arrows,
     ItemType_Armor,
     ];
     var shop_chances: Array<Chance> = [
     {val: 4, min: 0, max: 5},
     {val: 4, min: 0, max: 5},
-    {val: 2, min: 0, max: 5},
-    {val: 40, min: 0, max: 5},
+    {val: 4, min: 0, max: 5},
     ];
 
     var weapon_order = [
@@ -391,12 +373,13 @@ class Game {
     DudeType_Ghost,
     ];
     var dude_chances: Array<Chance> = [
-    {val: 8, min: 0, max: 10},
-    {val: 4, min: 0, max: 8},
-    {val: 3, min: 0, max: 5},
-    {val: 2, min: 0, max: 5},
+    {val: 8, min: 0, max: 15},
+    {val: 2, min: 0, max: 4},
+    {val: 2, min: 0, max: 4},
+    {val: 1, min: 0, max: 5},
     ];
 
+    var spawned_weapon = false;
     function generate_card_type():Dynamic {
         var type = CardType_None;
 
@@ -417,6 +400,9 @@ class Game {
             if (arcana_timer <= 0) {
                 active_arcana = null;
             }
+        } else if (!spawned_weapon) {
+            type = CardType_Weapon;
+            spawned_weapon = true;
         } else {
             type = get_chance(CardType, card_type_order, card_type_chances);
         }
@@ -538,9 +524,9 @@ class Game {
 
             item.name = "Weapon";
             switch (item.weapon_type) {
-                case WeaponType_Sword: item.value = Math.ceil((2 * card_level) * (1 + Random.float(-0.2, 0.2)));
-                case WeaponType_Spear: item.value = Math.ceil((1 * card_level) * (1 + Random.float(-0.2, 0.2)));
-                case WeaponType_Bow: item.value = Math.ceil((1.5 * card_level) * (1 + Random.float(-0.2, 0.2)));
+                case WeaponType_Sword: item.value = Math.ceil((card_level) * (1 + Random.float(-0.2, 0.2)));
+                case WeaponType_Spear: item.value = Math.ceil((0.5 * card_level) * (1 + Random.float(-0.2, 0.2)));
+                case WeaponType_Bow: item.value = Math.ceil((0.3 * card_level) * (1 + Random.float(-0.2, 0.2)));
                 case WeaponType_Laser: {
                     item.value = Math.ceil((3 * card_level) * (1 + Random.float(-0.2, 0.2)));
                     item.value_max = item.value;
@@ -553,15 +539,6 @@ class Game {
                 case WeaponType_Bow: item.tile = Tiles.Bow;
                 default: item.tile = Tiles.None;
             }
-
-            // Random hp bonus
-            if (Random.chance(10)) {
-                item.hp_bonus = Std.int(Random.float(0.75 * card_level, 1.25 * card_level));
-            }
-        } else if (item.type == ItemType_Arrows) {
-            item.amount = Random.int(7, 11);
-            item.tile = Tiles.Arrows;
-            item.name = "Arrows";
         } else if (item.type == ItemType_Bomb) {
             item.tile = Tiles.Bomb;
             item.name = "Bomb";
@@ -702,7 +679,7 @@ class Game {
                 if (number_of_dudes > 1) {
                     min_hp = 1;
                 }
-                dude.hp_max = Std.int(Math.max(min_hp, Math.ceil(card_level * (2.4 + Random.float(-0.5, 0.5)) / number_of_dudes)));
+                dude.hp_max = Std.int(Math.max(min_hp, Math.ceil(card_level * (1.4 + Random.float(-0.5, 0.5)) / number_of_dudes)));
                 dude.hp = dude.hp_max;
                 dude.dmg = Std.int(Math.max(min_hp, Math.ceil(card_level * (1.4 + Random.float(-0.5, 0.5)))));
                 dude.type = get_chance(DudeType, dude_order, dude_chances);
@@ -715,12 +692,12 @@ class Game {
             }
         } else if (card.type == CardType_Treasure || card.type == CardType_Weapon) {
 
-            var item = generate_item(treasure_order, treasure_chances);
+            var item = generate_item(treasure_order, treasure_chances, card);
             set_down_item(item);
             if (item != null && active_arcana == ArcanaType_Temperance) {
                 // Temperance effect: spawn another item with a 50% chance
                 if (Random.chance(50)) {
-                    var second_item = generate_item(treasure_order, treasure_chances);
+                    var second_item = generate_item(treasure_order, treasure_chances, card);
                     set_down_item(second_item);
                 }
 
@@ -1195,9 +1172,7 @@ class Game {
         Gfx.draw_tile(x, y, item.tile);
         Text.display(x, y, item.name);
         Text.display(x, y + tilesize / 2, '${item.value}');
-        if (item.type == ItemType_Arrows) {
-            Text.display(x + tilesize / 10, y + tilesize / 2, '${item.amount}');
-        } else if (item.type == ItemType_Armor && item.value <= 0) {
+        if (item.type == ItemType_Armor && item.value <= 0) {
             Gfx.fill_box(x, y, tilesize, tilesize, Col.RED, 0.5);
         } else if (item.type == ItemType_Money) {
             Text.display(x + tilesize - tilesize / 10, y + tilesize / 2, '${item.amount}');
@@ -1425,6 +1400,10 @@ class Game {
                 }
             }
         }
+
+        if (player.hp <= 0) {
+            Text.display(100, 300, "GAME OVER", Col.WHITE);
+        }
     }
 
     function out_of_bounds(x:Int, y:Int):Bool {
@@ -1443,22 +1422,7 @@ class Game {
             player.armor -= item.value;
         } else if (item.type == ItemType_Weapon) {
             player.weapon = WeaponType_None;
-        } else if (item.type == ItemType_Arrows && player.weapon == WeaponType_Bow) {
-            var have_arrows = false;
-            for (i in 0...inventory.length) {
-                if (inventory[i] != null && inventory[i].type == ItemType_Arrows && inventory[i].amount > 0) {
-                    have_arrows = true;
-                    break;
-                }
-            }
-
-            if (have_arrows) {
-                player.weapon = WeaponType_Bow;
-            } else {
-                player.weapon = WeaponType_None;
-            }
         }
-
         
         // Reset and count all bonuses again, for safety
         if (item.hp_bonus != 0) {
@@ -1482,37 +1446,7 @@ class Game {
         if (item.type == ItemType_Armor) {
             player.armor += item.value;
         } else if (item.type == ItemType_Weapon) {
-            if (item.weapon_type == WeaponType_Bow) {
-                // Change weapon to bow only if there are arrows to shoot, otherwise player attacks default to fists
-                var have_arrows = false;
-                for (i in 0...inventory.length) {
-                    if (inventory[i] != null && inventory[i].type == ItemType_Arrows && inventory[i].amount > 0) {
-                        have_arrows = true;
-                        break;
-                    }
-                }
-
-                if (have_arrows) {
-                    player.weapon = WeaponType_Bow;
-                } else {
-                    player.weapon = WeaponType_None;
-                }
-            } else {
-                player.weapon = item.weapon_type;
-            }
-        } else if (item.type == ItemType_Arrows) {
-            // Change weapon to bow if equipping arrows with a bow
-            var have_bow = false;
-            for (i in 0...inventory.length) {
-                if (inventory[i] != null && inventory[i].type == ItemType_Weapon && inventory[i].weapon_type == WeaponType_Bow) {
-                    have_bow = true;
-                    break;
-                }
-            }
-
-            if (have_bow) {
-                player.weapon = WeaponType_Bow;
-            }
+            player.weapon = item.weapon_type;
         }
 
         // Reset and count all bonuses again, for safety
@@ -1681,30 +1615,6 @@ class Game {
             }
 
             if (player.dx != 0 || player.dy != 0) {
-
-                if (player.weapon == WeaponType_Bow) {
-                    var arrows_min: Item = null;
-                    var arrows_min_slot = 0;
-                    var arrows_min_amount = 100000;
-                    for (i in 0...inventory.length) {
-                        if (inventory[i] != null && inventory[i].type == ItemType_Arrows) {
-                            if (inventory[i].amount < arrows_min_amount) {
-                                arrows_min = inventory[i];
-                                arrows_min_slot = i;
-                                arrows_min_amount = inventory[i].amount;
-                            }
-                        }
-                    }
-
-                    if (arrows_min != null) {
-                        arrows_min.amount--;
-                        if (arrows_min.amount == 0) {
-                            inventory[arrows_min_slot] = null;
-                            arrows_min.delete();
-                        }
-                    }
-                }
-
                 state = GameState_PlayerVisual;
                 player.attacked = true;
                 player.moved = false;
@@ -2459,8 +2369,8 @@ class Game {
                             }
                         }
                         case DudeType_Shooter: {
-                            var dude_player_dx = player.x - dude.x;
-                            var dude_player_dy = player.y - dude.y;
+                            var dude_player_dx = Math.sign(player.x - dude.x);
+                            var dude_player_dy = Math.sign(player.y - dude.y);
                             if (dude_player_dx == 0 || dude_player_dy == 0) {
                                 var x: Int = Std.int(dude.x);
                                 var y: Int = Std.int(dude.y);
@@ -2472,8 +2382,8 @@ class Game {
                                     } else if (!out_of_bounds(x, y) && x == player.x && y == player.y) {
                                         dude.attacked = true;
                                         player.incoming_damage += dude.dmg;
-                                        dude.dx = Math.sign(dude_player_dx);
-                                        dude.dy = Math.sign(dude_player_dy);
+                                        dude.dx = dude_player_dx;
+                                        dude.dy = dude_player_dy;
                                         break;
                                     }
                                 }
@@ -3098,9 +3008,6 @@ class Game {
                     }
                     return info;
                 }
-                case ItemType_Arrows: {
-                    return 'Arrows: ${item.name}\nAmount: ${item.amount}';
-                }
                 default: return "default item info";
             }
         }
@@ -3163,22 +3070,22 @@ class Game {
         GUI.auto_text_button("godmode", function() { GOD_MODE = true; });
         GUI.auto_text_button('increment card level: ${card_level}', function() { card_level++; });
         // Item tester
-        if (Input.just_pressed(Key.SPACE)) { 
-            for (item in Entity.get(Item)) {
-                if (item.x == player.x + 1 && item.y == player.y) {
-                    item.delete();
-                    break;
-                }
-            }
+        // if (Input.just_pressed(Key.SPACE)) { 
+        //     for (item in Entity.get(Item)) {
+        //         if (item.x == player.x + 1 && item.y == player.y) {
+        //             item.delete();
+        //             break;
+        //         }
+        //     }
 
-            var old_default_item_type = default_item_type;
-            default_item_type = ItemType_Armor;
-            var item = generate_item(treasure_order, treasure_chances);
-            default_item_type = old_default_item_type;
+        //     var old_default_item_type = default_item_type;
+        //     default_item_type = ItemType_Armor;
+        //     var item = generate_item(treasure_order, treasure_chances);
+        //     default_item_type = old_default_item_type;
 
-            item.on_ground = true;
-            item.x = player.x + 1;
-            item.y = player.y;
-        }
+        //     item.on_ground = true;
+        //     item.x = player.x + 1;
+        //     item.y = player.y;
+        // }
     }
 }

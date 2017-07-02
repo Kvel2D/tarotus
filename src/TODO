@@ -1,6 +1,6 @@
-
-balance numbers
-
+playtest and balance numbers
+remove armor mechanic(NOT GOOD) remove repair from shop as well
+decrease amount of armor
 
 DONE:
 
@@ -28,7 +28,7 @@ hp recovery
 +dmg for some time
 double speed for some time(you get extra turn)
 armor recovery(do not make a potion like this, should be a unique shop feature)
-
+hp buffer(like a magic shield)
 
 ITEM STATS:
 +-hp

@@ -11,7 +11,6 @@ enum ItemType {
 	ItemType_Weapon;
 	ItemType_Armor;
 	ItemType_Consumable;
-	ItemType_Arrows;
 	ItemType_Bomb;
 	ItemType_Money;
 }
